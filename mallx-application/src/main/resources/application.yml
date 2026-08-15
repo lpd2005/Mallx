@@ -1,0 +1,5 @@
+spring:
+  application:
+    name: mallx-application
+  profiles:
+    active: dev

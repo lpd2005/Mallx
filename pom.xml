@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.5.9</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.mallx</groupId>
+    <artifactId>mallx-parent</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>MallX Parent</name>
+    <description>MallX modular monolith parent project</description>
+
+    <properties>
+        <java.version>17</java.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <modules>
+        <module>mall-common</module>
+        <module>mall-auth</module>
+        <module>mall-user</module>
+        <module>mall-product</module>
+        <module>mall-inventory</module>
+        <module>mall-cart</module>
+        <module>mall-order</module>
+        <module>mall-payment</module>
+        <module>mall-coupon</module>
+        <module>mall-seckill</module>
+        <module>mall-search</module>
+        <module>mall-after-sale</module>
+        <module>mall-admin</module>
+        <module>mall-ai</module>
+        <module>mallx-application</module>
+    </modules>
+</project>

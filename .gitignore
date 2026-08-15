@@ -1,0 +1,21 @@
+# IDE
+.idea/
+*.iml
+
+# Maven
+**/target/
+
+# Local configuration and secrets
+**/application-local.yml
+**/application-local.yaml
+.env
+.env.*
+!.env.example
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
