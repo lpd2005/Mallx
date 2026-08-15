@@ -1,0 +1,334 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  MallX 日志配置（logback-spring.xml）
+  - 统一日志格式模板 LOG_PATTERN
+  - 按业务模块拆分日志文件：每个模块独立一个 appender（MALL_XXX）
+  - 模块日志同时输出到控制台，方便本地调试
+  - 未匹配到任何模块的日志（框架/三方库）由 root 兜底，写入应用总日志
+-->
+<configuration>
+
+    <!-- 日志根目录：读取 Spring 配置项 logging.file.path，未配置时默认使用 ./logs -->
+    <springProperty scope="context" name="LOG_PATH" source="logging.file.path" defaultValue="./logs"/>
+
+    <!-- 统一日志格式模板：日期时间 [线程] 级别(左对齐5位) 类名(超长截断40字符) - 日志消息 -->
+    <property name="LOG_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{40} - %msg%n"/>
+
+    <!-- 控制台输出器：所有模块日志同时打印到控制台 -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- 应用总日志输出器：接收所有未被模块路由的日志（Spring 框架、三方库等） -->
+    <appender name="APPLICATION" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/mallx-application/mallx-application.log</file>
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <!-- 滚动策略（所有文件输出器均采用相同策略）：
+             SizeAndTimeBasedRollingPolicy 按天 + 按大小双重滚动
+             maxFileSize    单文件超过 20MB 触发滚动
+             maxHistory     归档日志最多保留 30 天
+             totalSizeCap   归档总大小上限 2GB，超出自动清理最旧文件 -->
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/mallx-application/archive/mallx-application.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>20MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>2GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- 商城公共模块日志输出器：com.mallx.common 包日志 -->
+    <appender name="MALL_COMMON" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/mall-common/mall-common.log</file>
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/mall-common/archive/mall-common.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>20MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>2GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- 认证授权模块日志输出器：com.mallx.auth 包日志 -->
+    <appender name="MALL_AUTH" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/mall-auth/mall-auth.log</file>
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/mall-auth/archive/mall-auth.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>20MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>2GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- 用户模块日志输出器：com.mallx.user 包日志 -->
+    <appender name="MALL_USER" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/mall-user/mall-user.log</file>
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/mall-user/archive/mall-user.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>20MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>2GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- 商品模块日志输出器：com.mallx.product 包日志 -->
+    <appender name="MALL_PRODUCT" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/mall-product/mall-product.log</file>
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/mall-product/archive/mall-product.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>20MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>2GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- 库存模块日志输出器：com.mallx.inventory 包日志 -->
+    <appender name="MALL_INVENTORY" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/mall-inventory/mall-inventory.log</file>
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/mall-inventory/archive/mall-inventory.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>20MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>2GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- 购物车模块日志输出器：com.mallx.cart 包日志 -->
+    <appender name="MALL_CART" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/mall-cart/mall-cart.log</file>
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/mall-cart/archive/mall-cart.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>20MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>2GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- 订单模块日志输出器：com.mallx.order 包日志 -->
+    <appender name="MALL_ORDER" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/mall-order/mall-order.log</file>
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/mall-order/archive/mall-order.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>20MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>2GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- 支付模块日志输出器：com.mallx.payment 包日志 -->
+    <appender name="MALL_PAYMENT" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/mall-payment/mall-payment.log</file>
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/mall-payment/archive/mall-payment.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>20MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>2GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- 优惠券模块日志输出器：com.mallx.coupon 包日志 -->
+    <appender name="MALL_COUPON" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/mall-coupon/mall-coupon.log</file>
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/mall-coupon/archive/mall-coupon.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>20MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>2GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- 秒杀模块日志输出器：com.mallx.seckill 包日志 -->
+    <appender name="MALL_SECKILL" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/mall-seckill/mall-seckill.log</file>
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/mall-seckill/archive/mall-seckill.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>20MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>2GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- 搜索模块日志输出器：com.mallx.search 包日志 -->
+    <appender name="MALL_SEARCH" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/mall-search/mall-search.log</file>
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/mall-search/archive/mall-search.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>20MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>2GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- 售后模块日志输出器：com.mallx.aftersale 包日志 -->
+    <appender name="MALL_AFTER_SALE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/mall-after-sale/mall-after-sale.log</file>
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/mall-after-sale/archive/mall-after-sale.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>20MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>2GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- 后台管理模块日志输出器：com.mallx.admin 包日志 -->
+    <appender name="MALL_ADMIN" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/mall-admin/mall-admin.log</file>
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/mall-admin/archive/mall-admin.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>20MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>2GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- 智能模块日志输出器：com.mallx.ai 包日志 -->
+    <appender name="MALL_AI" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/mall-ai/mall-ai.log</file>
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/mall-ai/archive/mall-ai.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>20MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>2GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- 以下 logger 按包名路由日志：
+         additivity="false" 表示禁止向上传递，日志只写入此处指定的输出器，
+         避免与 root 重复输出；同时每个模块日志都会打印到控制台 -->
+    <logger name="com.mallx.common" level="INFO" additivity="false">
+        <appender-ref ref="MALL_COMMON"/>
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+
+    <logger name="com.mallx.auth" level="INFO" additivity="false">
+        <appender-ref ref="MALL_AUTH"/>
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+
+    <logger name="com.mallx.user" level="INFO" additivity="false">
+        <appender-ref ref="MALL_USER"/>
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+
+    <logger name="com.mallx.product" level="INFO" additivity="false">
+        <appender-ref ref="MALL_PRODUCT"/>
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+
+    <logger name="com.mallx.inventory" level="INFO" additivity="false">
+        <appender-ref ref="MALL_INVENTORY"/>
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+
+    <logger name="com.mallx.cart" level="INFO" additivity="false">
+        <appender-ref ref="MALL_CART"/>
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+
+    <logger name="com.mallx.order" level="INFO" additivity="false">
+        <appender-ref ref="MALL_ORDER"/>
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+
+    <logger name="com.mallx.payment" level="INFO" additivity="false">
+        <appender-ref ref="MALL_PAYMENT"/>
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+
+    <logger name="com.mallx.coupon" level="INFO" additivity="false">
+        <appender-ref ref="MALL_COUPON"/>
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+
+    <logger name="com.mallx.seckill" level="INFO" additivity="false">
+        <appender-ref ref="MALL_SECKILL"/>
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+
+    <logger name="com.mallx.search" level="INFO" additivity="false">
+        <appender-ref ref="MALL_SEARCH"/>
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+
+    <logger name="com.mallx.aftersale" level="INFO" additivity="false">
+        <appender-ref ref="MALL_AFTER_SALE"/>
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+
+    <logger name="com.mallx.admin" level="INFO" additivity="false">
+        <appender-ref ref="MALL_ADMIN"/>
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+
+    <logger name="com.mallx.ai" level="INFO" additivity="false">
+        <appender-ref ref="MALL_AI"/>
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+
+    <!-- 根日志：所有未匹配到上述 logger 的日志（框架、三方库等）写入应用总日志 + 控制台 -->
+    <root level="INFO">
+        <appender-ref ref="APPLICATION"/>
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</configuration>

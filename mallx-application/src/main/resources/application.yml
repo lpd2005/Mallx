@@ -2,4 +2,40 @@ spring:
   application:
     name: mallx-application
   profiles:
-    active: dev
+    active: ${SPRING_PROFILES_ACTIVE:local}
+  config:
+    import: optional:classpath:application-local.yml
+  datasource:
+    url: jdbc:mysql://${mall.db.host}:3306/${mall.db.name:mall}?useUnicode=true&characterEncoding=UTF-8&autoReconnect=true&serverTimezone=Asia/Shanghai
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    type: com.alibaba.druid.pool.DruidDataSource
+    username: root
+    password: ${mall.db.pw}
+  data:
+    redis:
+      host: ${mall.redis.host:localhost}
+      port: ${mall.redis.port:6379}
+      # 密码为空时，不设置密码。
+      password: ${mall.redis.pw:}
+  rabbitmq:
+    host: ${mall.mq.host:localhost}
+    port: ${mall.mq.port:5672}
+    username: ${mall.mq.username:guest}
+    password: ${mall.mq.pw:guest}
+
+mallx:
+  aliyun:
+    oss:
+      endpoint: ${mall.oss.endpoint:}
+      bucket-name: ${mall.oss.bucket-name:}
+      region: ${mall.oss.region:}
+      # 阿里云 OSS 的访问凭证不要填写在此文件中，请使用环境变量：
+      # OSS_ACCESS_KEY_ID=
+      # OSS_ACCESS_KEY_SECRET=
+
+# 日志目录默认为父项目运行目录下的 ./logs；本机可通过 LOG_PATH 覆盖。
+logging:
+  file:
+    path: ${LOG_PATH:./logs}
+  level:
+    root: INFO
