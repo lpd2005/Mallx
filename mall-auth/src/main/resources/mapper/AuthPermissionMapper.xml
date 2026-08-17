@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mallx.auth.mapper.AuthPermissionMapper">
+
+    <!--
+        查询账号通过已启用角色获得的权限。
+        ap = auth_permission，arp = auth_role_permission，
+        aar = auth_account_role，ar = auth_role。
+    -->
+    <select id="selectPermissionCodesByAccountId" resultType="java.lang.String">
+        SELECT DISTINCT ap.permission_code
+        FROM auth_permission ap
+                 JOIN auth_role_permission arp ON arp.permission_id = ap.id
+                 JOIN auth_account_role aar ON aar.role_id = arp.role_id
+                 JOIN auth_role ar ON ar.id = aar.role_id
+        WHERE aar.account_id = #{accountId}
+          AND ar.status = 1
+    </select>
+</mapper>
