@@ -12,5 +12,6 @@ public class CurrentUserResponse {
 
     private Long userId;
 
-    private String username;
+    /** 脱敏后的登录手机号，例如 138****8000。 */
+    private String maskedPhone;
 }

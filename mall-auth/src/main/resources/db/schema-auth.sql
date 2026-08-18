@@ -2,13 +2,13 @@
 
 CREATE TABLE IF NOT EXISTS auth_account (
     id BIGINT NOT NULL COMMENT '用户身份主键',
-    username VARCHAR(64) NOT NULL COMMENT '唯一登录名',
+    phone VARCHAR(20) NOT NULL COMMENT '唯一登录手机号',
     password_hash VARCHAR(100) NOT NULL COMMENT 'BCrypt 密码摘要',
     status TINYINT NOT NULL DEFAULT 1 COMMENT '账号状态：1 启用，0 禁用',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_auth_account_username (username)
+    UNIQUE KEY uk_auth_account_phone (phone)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='认证账号';
 
 CREATE TABLE IF NOT EXISTS auth_role (

@@ -20,8 +20,8 @@ public class AuthAccount {
     @TableId(value = "id")
     private Long id;
 
-    /** 全局唯一登录名。 */
-    private String username;
+    /** 全局唯一登录手机号。 */
+    private String phone;
 
     /** BCrypt 加密后的密码摘要，禁止返回给前端。 */
     private String passwordHash;

@@ -10,7 +10,7 @@ import com.mallx.auth.vo.LoginResponse;
 public interface AuthService {
 
     /**
-     * 校验账号密码并创建 Sa-Token 会话。
+     * 校验手机号和密码并创建 Sa-Token 会话。
      *
      * @param request 登录请求
      * @return 新会话的令牌信息

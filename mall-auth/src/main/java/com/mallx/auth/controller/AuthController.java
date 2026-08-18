@@ -24,7 +24,7 @@ public class AuthController {
     private final AuthService authService;
 
     /**
-     * 账号密码登录。
+     * 手机号与密码登录。
      *
      * @param request 登录参数
      * @return 会话令牌
