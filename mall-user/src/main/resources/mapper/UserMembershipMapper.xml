@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mallx.user.mapper.UserMembershipMapper">
+
+    <!--
+        VIP到期处理：
+        1. 普通会员升级的VIP恢复普通会员；
+        2. 非会员直接开通的VIP标记为已过期；
+        3. WHERE条件确保并发任务只有一个能够更新并写入日志。
+    -->
+    <update id="expireVipIfNecessary">
+        UPDATE user_membership
+        SET level_code = CASE
+                             WHEN fallback_level_code = 1 THEN fallback_level_code
+                             ELSE level_code
+                         END,
+            start_at = CASE
+                           WHEN fallback_level_code = 1 THEN COALESCE(fallback_start_at, start_at)
+                           ELSE start_at
+                       END,
+            expire_at = CASE
+                            WHEN fallback_level_code = 1 THEN NULL
+                            ELSE expire_at
+                        END,
+            status = CASE
+                         WHEN fallback_level_code = 1 THEN 1
+                         ELSE 2
+                     END,
+            fallback_level_code = NULL,
+            fallback_start_at = NULL,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = #{userId}
+          AND level_code = 2
+          AND status = 1
+          AND expire_at IS NOT NULL
+          AND expire_at &lt;= #{now}
+    </update>
+
+</mapper>
