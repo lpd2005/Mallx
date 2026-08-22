@@ -13,11 +13,13 @@ import com.mallx.product.mapper.ProductSkuMapper;
 import com.mallx.product.service.ProductSkuService;
 import com.mallx.product.service.ProductSpuService;
 import com.mallx.product.vo.SkuVO;
+import com.mallx.product.vo.CartProductVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 
@@ -27,6 +29,7 @@ import java.util.List;
 public class ProductSkuServiceImpl extends ServiceImpl<ProductSkuMapper, ProductSku>
         implements ProductSkuService {
     private final ProductSpuService spuService;
+    private final ProductSkuMapper productSkuMapper;
 
     /** 创建初始状态为草稿的SKU。 */
     @Override
@@ -107,6 +110,22 @@ public class ProductSkuServiceImpl extends ServiceImpl<ProductSkuMapper, Product
         if (!ProductStatus.ON_SHELF.matches(sku.getStatus()))
             throw new BusinessException(ResultCode.NOT_FOUND, "SKU不存在或未上架");
         return toVO(sku);
+    }
+
+    /** 一次查询购物车中多个SKU及其所属SPU的当前信息，避免N+1查询。 */
+    @Override
+    public List<CartProductVO> listCartProducts(Collection<Long> skuIds) {
+        if (skuIds == null || skuIds.isEmpty()) {
+            return List.of();
+        }
+        List<Long> validSkuIds = skuIds.stream()
+                .filter(skuId -> skuId != null && skuId > 0)
+                .distinct()
+                .toList();
+        if (validSkuIds.isEmpty()) {
+            return List.of();
+        }
+        return productSkuMapper.selectCartProducts(validSkuIds);
     }
 
     private void validateRequest(Long excludedId, SkuRequest request) {

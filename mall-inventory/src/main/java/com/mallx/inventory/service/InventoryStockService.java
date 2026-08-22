@@ -4,10 +4,15 @@ import com.baomidou.mybatisplus.spring.service.IService;
 import com.mallx.inventory.entity.InventoryStock;
 import com.mallx.inventory.vo.InventoryStockVO;
 
+import java.util.Collection;
+import java.util.List;
+
 /** SKU库存业务服务。 */
 public interface InventoryStockService extends IService<InventoryStock> {
     /** 查询SKU当前库存。 */
     InventoryStockVO getStock(Long skuId);
+    /** 批量查询SKU当前库存，不存在的库存记录不会出现在结果中。 */
+    List<InventoryStockVO> listStocks(Collection<Long> skuIds);
     /** 通过入库等业务增加可用库存。 */
     InventoryStockVO increaseAvailable(Long skuId, int quantity, String businessNo, String remark);
     /** 下单时将可用库存转为锁定库存。 */

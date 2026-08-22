@@ -26,7 +26,7 @@ class ProductSkuServiceImplTest {
 
     @Test
     void createSkuShouldRejectMarketPriceBelowSalePrice() {
-        ProductSkuServiceImpl service = new ProductSkuServiceImpl(spuService);
+        ProductSkuServiceImpl service = new ProductSkuServiceImpl(spuService, skuMapper);
         SkuRequest request = request();
         request.setSalePrice(new BigDecimal("100.00"));
         request.setMarketPrice(new BigDecimal("99.00"));
@@ -35,7 +35,7 @@ class ProductSkuServiceImplTest {
 
     @Test
     void createSkuShouldRejectNonObjectSpecJson() {
-        ProductSkuServiceImpl service = new ProductSkuServiceImpl(spuService);
+        ProductSkuServiceImpl service = new ProductSkuServiceImpl(spuService, skuMapper);
         SkuRequest request = request();
         request.setSpecJson("not-json");
         assertThrows(BusinessException.class, () -> service.createSku(request));
@@ -43,7 +43,7 @@ class ProductSkuServiceImplTest {
 
     @Test
     void deleteSkuShouldPhysicallyDeleteDraftSku() {
-        ProductSkuServiceImpl service = new ProductSkuServiceImpl(spuService);
+        ProductSkuServiceImpl service = new ProductSkuServiceImpl(spuService, skuMapper);
         ReflectionTestUtils.setField(service, "baseMapper", skuMapper);
         ProductSku sku = new ProductSku();
         sku.setId(1L);
@@ -58,7 +58,7 @@ class ProductSkuServiceImplTest {
 
     @Test
     void deleteSkuShouldRejectSkuThatHasBeenPublished() {
-        ProductSkuServiceImpl service = new ProductSkuServiceImpl(spuService);
+        ProductSkuServiceImpl service = new ProductSkuServiceImpl(spuService, skuMapper);
         ReflectionTestUtils.setField(service, "baseMapper", skuMapper);
         ProductSku sku = new ProductSku();
         sku.setId(1L);

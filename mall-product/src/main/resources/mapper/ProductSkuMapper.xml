@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mallx.product.mapper.ProductSkuMapper">
+
+    <!-- 动态SKU集合并关联SPU，属于购物车批量组装需要的复杂查询。 -->
+    <select id="selectCartProducts" resultType="com.mallx.product.vo.CartProductVO">
+        SELECT sku.id AS sku_id,
+               sku.spu_id,
+               spu.product_name,
+               sku.sku_name,
+               sku.spec_json,
+               COALESCE(sku.image_oss_key, spu.main_image_oss_key) AS image_oss_key,
+               sku.sale_price,
+               sku.market_price,
+               spu.status AS spu_status,
+               sku.status AS sku_status
+        FROM product_sku sku
+        INNER JOIN product_spu spu ON spu.id = sku.spu_id
+        WHERE sku.id IN
+        <foreach collection="skuIds" item="skuId" open="(" separator="," close=")">
+            #{skuId}
+        </foreach>
+    </select>
+
+</mapper>

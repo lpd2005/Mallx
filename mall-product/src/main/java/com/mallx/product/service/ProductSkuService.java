@@ -4,7 +4,9 @@ import com.baomidou.mybatisplus.spring.service.IService;
 import com.mallx.product.dto.SkuRequest;
 import com.mallx.product.entity.ProductSku;
 import com.mallx.product.vo.SkuVO;
+import com.mallx.product.vo.CartProductVO;
 
+import java.util.Collection;
 import java.util.List;
 
 /** SKU业务服务，SKU是商品定价和库存管理的最小单元。 */
@@ -23,4 +25,6 @@ public interface ProductSkuService extends IService<ProductSku> {
     List<SkuVO> listBySpu(Long spuId);
     /** 查询前台可见的已上架SKU。 */
     SkuVO getSku(Long skuId);
+    /** 批量查询购物车展示所需的SPU和SKU当前信息。 */
+    List<CartProductVO> listCartProducts(Collection<Long> skuIds);
 }

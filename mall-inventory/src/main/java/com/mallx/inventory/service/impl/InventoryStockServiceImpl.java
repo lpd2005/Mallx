@@ -17,6 +17,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
+import java.util.List;
+
 /** 库存核心服务，所有数量变化均使用带下限条件的数据库原子更新。 */
 @Service
 @RequiredArgsConstructor
@@ -33,6 +36,26 @@ public class InventoryStockServiceImpl extends ServiceImpl<InventoryStockMapper,
     @Override
     public InventoryStockVO getStock(Long skuId) {
         return toVO(requireStock(skuId));
+    }
+
+    /** 使用MyBatis-Plus单表IN查询批量获取购物车所需库存。 */
+    @Override
+    public List<InventoryStockVO> listStocks(Collection<Long> skuIds) {
+        if (skuIds == null || skuIds.isEmpty()) {
+            return List.of();
+        }
+        List<Long> validSkuIds = skuIds.stream()
+                .filter(skuId -> skuId != null && skuId > 0)
+                .distinct()
+                .toList();
+        if (validSkuIds.isEmpty()) {
+            return List.of();
+        }
+        return lambdaQuery()
+                .in(InventoryStock::getSkuId, validSkuIds)
+                .list().stream()
+                .map(this::toVO)
+                .toList();
     }
 
     /** 入库增加可用库存，并在首次入库时幂等创建库存记录。 */
