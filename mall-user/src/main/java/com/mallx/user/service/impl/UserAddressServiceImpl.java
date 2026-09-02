@@ -47,6 +47,12 @@ public class UserAddressServiceImpl extends ServiceImpl<UserAddressMapper, UserA
                 .stream().map(this::toAddressVO).toList();
     }
 
+    /** 返回指定有效地址，并校验地址归属。 */
+    @Override
+    public UserAddressVO getAddress(Long userId, Long addressId) {
+        return toAddressVO(requireOwnedAddress(userId, addressId));
+    }
+
     /**
      * 新增地址与默认地址切换必须在一个事务中完成。
      */

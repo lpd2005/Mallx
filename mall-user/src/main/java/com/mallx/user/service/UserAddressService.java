@@ -18,6 +18,9 @@ public interface UserAddressService extends IService<UserAddress> {
      */
     List<UserAddressVO> listAddresses(Long userId);
 
+    /** 查询属于指定用户的有效收货地址，供订单创建时生成地址快照。 */
+    UserAddressVO getAddress(Long userId, Long addressId);
+
     /**
      * 新增地址；第一条地址会自动成为默认地址。
      *
