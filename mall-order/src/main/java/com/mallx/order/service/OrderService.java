@@ -29,4 +29,13 @@ public interface OrderService extends IService<MallOrder> {
     void markPaid(String orderNo, String paymentNo, LocalDateTime paidAt);
 
     int closeExpiredOrders(int batchSize);
+
+    /** 在调用方事务中锁定订单并进入售后；returnRequired区分未发货退款和退货退款。 */
+    OrderAfterSaleVO beginAfterSale(Long userId, String orderNo, String afterSaleNo, boolean returnRequired);
+
+    /** 售后驳回或撤销时恢复原履约状态。 */
+    void restoreAfterSale(Long userId, String orderNo, String afterSaleNo, Long operatorId);
+
+    /** 模拟退款成功后关闭整单，按验收结果回补库存并退还优惠券。 */
+    void completeAfterSale(Long userId, String orderNo, String afterSaleNo, boolean restock);
 }

@@ -237,6 +237,83 @@ public class OrderServiceImpl extends ServiceImpl<MallOrderMapper, MallOrder>
         return count;
     }
 
+    /** 必须参与售后模块外层事务，不能独立提交订单状态。 */
+    @Override
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public OrderAfterSaleVO beginAfterSale(Long userId, String orderNo, String afterSaleNo, boolean returnRequired) {
+        requireUser(userId);
+        MallOrder order = lockOrder(orderNo);
+        if (!userId.equals(order.getUserId())) {
+            throw forbidden();
+        }
+        boolean allowed = returnRequired
+                ? OrderStatus.SHIPPED.matches(order.getStatus()) || OrderStatus.COMPLETED.matches(order.getStatus())
+                : OrderStatus.PAID.matches(order.getStatus()) || OrderStatus.WAIT_SHIP.matches(order.getStatus());
+        if (!allowed) {
+            throw bad(returnRequired ? "仅已发货或已完成订单可以申请退货退款" : "仅已支付且未发货订单可以申请仅退款");
+        }
+        Integer originalStatus = order.getStatus();
+        order.setStatusBeforeAfterSale(originalStatus);
+        order.setAfterSaleNo(requireNo(afterSaleNo));
+        order.setStatus(OrderStatus.AFTER_SALE.getValue());
+        updateRequired(order, "订单进入售后失败");
+        saveLog(order, originalStatus, OrderStatus.AFTER_SALE, OrderOperationType.AFTER_SALE_APPLY,
+                userId, "申请售后：" + afterSaleNo);
+        return OrderAfterSaleVO.builder().orderId(order.getId()).orderNo(order.getOrderNo())
+                .originalStatus(originalStatus).payAmount(order.getPayAmount()).build();
+    }
+
+    @Override
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public void restoreAfterSale(Long userId, String orderNo, String afterSaleNo, Long operatorId) {
+        MallOrder order = requireBoundAfterSale(userId, orderNo, afterSaleNo);
+        OrderStatus original = Arrays.stream(OrderStatus.values())
+                .filter(status -> status.matches(order.getStatusBeforeAfterSale()))
+                .filter(status -> status == OrderStatus.PAID || status == OrderStatus.WAIT_SHIP
+                        || status == OrderStatus.SHIPPED || status == OrderStatus.COMPLETED)
+                .findFirst().orElseThrow(() -> bad("订单原状态不正确"));
+        requireStatus(order, OrderStatus.AFTER_SALE);
+        order.setStatus(original.getValue());
+        updateRequired(order, "恢复订单状态失败");
+        saveLog(order, OrderStatus.AFTER_SALE.getValue(), original, OrderOperationType.AFTER_SALE_CLOSE,
+                operatorId, "售后撤销或驳回：" + afterSaleNo);
+    }
+
+    @Override
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public void completeAfterSale(Long userId, String orderNo, String afterSaleNo, boolean restock) {
+        MallOrder order = requireBoundAfterSale(userId, orderNo, afterSaleNo);
+        if (OrderStatus.REFUNDED.matches(order.getStatus())) {
+            return;
+        }
+        requireStatus(order, OrderStatus.AFTER_SALE);
+        // 支付时库存已转为已售，不可调用releaseStock释放锁定库存。
+        if (restock) {
+            List<OrderItem> orderItems = items(order.getId()).stream()
+                    .sorted(Comparator.comparing(OrderItem::getSkuId)).toList();
+            for (OrderItem item : orderItems) {
+                inventoryService.restockAfterSale(item.getSkuId(), item.getQuantity(), afterSaleNo);
+            }
+        }
+        if (order.getCouponUserId() != null) {
+            couponService.rollbackForOrder(order.getCouponUserId(), orderNo);
+        }
+        order.setStatus(OrderStatus.REFUNDED.getValue());
+        order.setRefundedAt(LocalDateTime.now());
+        updateRequired(order, "订单退款状态更新失败");
+        saveLog(order, OrderStatus.AFTER_SALE.getValue(), OrderStatus.REFUNDED,
+                OrderOperationType.REFUND, null, "售后整单退款：" + afterSaleNo);
+    }
+
+    private MallOrder requireBoundAfterSale(Long userId, String orderNo, String afterSaleNo) {
+        requireUser(userId);
+        MallOrder order = lockOrder(orderNo);
+        if (!userId.equals(order.getUserId()) || !requireNo(afterSaleNo).equals(order.getAfterSaleNo())) {
+            throw bad("订单与售后申请不匹配");
+        }
+        return order;
+    }
+
     private void cancelLocked(MallOrder o, String reason, Long operator, OrderOperationType type) {
         if (OrderStatus.CANCELED.matches(o.getStatus())) return;
         requireStatus(o, OrderStatus.WAIT_PAY);
@@ -383,6 +460,8 @@ public class OrderServiceImpl extends ServiceImpl<MallOrderMapper, MallOrder>
                 .orderNo(o.getOrderNo())
                 .status(o.getStatus())
                 .totalQuantity(o.getTotalQuantity())
+                .afterSaleNo(o.getAfterSaleNo())
+                .refundedAt(o.getRefundedAt())
                 .productAmount(o.getProductAmount())
                 .memberDiscountAmount(o.getMemberDiscountAmount())
                 .couponDiscountAmount(o.getCouponDiscountAmount())

@@ -26,6 +26,15 @@ public class MallOrder {
     /** 订单状态，见 {@code OrderStatus}。 */
     private Integer status;
 
+    /** 最近一次售后单号，防止旧售后请求覆盖新申请。 */
+    private String afterSaleNo;
+
+    /** 进入售后前的订单状态，撤销或驳回时恢复。 */
+    private Integer statusBeforeAfterSale;
+
+    /** 整单退款完成时间。 */
+    private LocalDateTime refundedAt;
+
     /** 商品购买总件数。 */
     private Integer totalQuantity;
 

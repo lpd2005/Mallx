@@ -106,6 +106,20 @@ class InventoryStockServiceImplTest {
         assertThrows(BusinessException.class, () -> stockService.lockStock(SKU_ID, 3, "ORDER-1003"));
     }
 
+    @Test
+    void afterSaleRestockPreservesCumulativeSoldAndLockedStock() {
+        when(stockMapper.selectById(SKU_ID)).thenReturn(stock(7, 0, 3), stock(10, 0, 3));
+        when(operationMapper.insertIgnore(any(InventoryOperation.class))).thenReturn(1);
+        when(stockMapper.update(any(), any())).thenReturn(1);
+        when(operationService.updateById(any(InventoryOperation.class))).thenReturn(true);
+        InventoryStockVO result = stockService.restockAfterSale(SKU_ID, 3, "AS-1001");
+        assertEquals(10, result.getAvailableStock());
+        assertEquals(3, result.getSoldStock());
+        assertEquals(0, result.getLockedStock());
+        verify(operationMapper).insertIgnore(org.mockito.ArgumentMatchers.argThat(
+                operation -> operation.getOperationType() == 5 && "AS-1001".equals(operation.getBusinessNo())));
+    }
+
     private InventoryStock stock(int available, int locked, int sold) {
         InventoryStock stock = new InventoryStock();
         stock.setSkuId(SKU_ID);

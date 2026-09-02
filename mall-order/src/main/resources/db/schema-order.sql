@@ -3,7 +3,10 @@ CREATE TABLE IF NOT EXISTS mall_order (
     id BIGINT NOT NULL COMMENT '订单主键',
     order_no VARCHAR(64) NOT NULL COMMENT '订单号',
     user_id BIGINT NOT NULL COMMENT '下单用户ID',
-    status TINYINT NOT NULL COMMENT '订单状态：1待支付，2已支付，3待发货，4已发货，5已完成，6已取消',
+    status TINYINT NOT NULL COMMENT '订单状态：1待支付，2已支付，3待发货，4已发货，5已完成，6已取消，7售后中，8已退款',
+    after_sale_no VARCHAR(64) DEFAULT NULL COMMENT '最近一次售后单号',
+    status_before_after_sale TINYINT DEFAULT NULL COMMENT '进入售后前的订单状态',
+    refunded_at DATETIME DEFAULT NULL COMMENT '整单退款完成时间',
     total_quantity INT NOT NULL COMMENT '商品购买总件数',
     product_amount DECIMAL(12,2) NOT NULL COMMENT '商品原价合计',
     member_discount_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00 COMMENT '会员优惠金额',
@@ -32,7 +35,7 @@ CREATE TABLE IF NOT EXISTS mall_order (
     UNIQUE KEY uk_order_no (order_no),
     KEY idx_order_user (user_id, created_at),
     KEY idx_order_status_expire (status, expire_at),
-    CONSTRAINT chk_order_status CHECK (status IN (1, 2, 3, 4, 5, 6)),
+    CONSTRAINT chk_order_status CHECK (status IN (1, 2, 3, 4, 5, 6, 7, 8)),
     CONSTRAINT chk_order_amount CHECK (
         product_amount >= 0
         AND member_discount_amount >= 0
@@ -69,11 +72,11 @@ CREATE TABLE IF NOT EXISTS order_operation_log (
     order_no VARCHAR(64) NOT NULL COMMENT '订单号',
     before_status TINYINT DEFAULT NULL COMMENT '操作前订单状态，创建订单时为空',
     after_status TINYINT NOT NULL COMMENT '操作后订单状态',
-    operation_type TINYINT NOT NULL COMMENT '操作类型：1创建，2支付，3备货，4发货，5收货，6取消，7超时关闭',
+    operation_type TINYINT NOT NULL COMMENT '操作类型：1创建，2支付，3备货，4发货，5收货，6取消，7超时关闭，8申请售后，9退出售后，10退款',
     operator_id BIGINT DEFAULT NULL COMMENT '操作人ID，系统任务操作时为空',
     remark VARCHAR(255) DEFAULT NULL COMMENT '操作说明',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (id),
     KEY idx_order_log_order (order_id, created_at),
-    CONSTRAINT chk_order_log_type CHECK (operation_type IN (1, 2, 3, 4, 5, 6, 7))
+    CONSTRAINT chk_order_log_type CHECK (operation_type IN (1, 2, 3, 4, 5, 6, 7, 8, 9, 10))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单状态流水';

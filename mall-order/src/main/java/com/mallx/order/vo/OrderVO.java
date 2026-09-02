@@ -13,6 +13,8 @@ import java.util.List;
 public class OrderVO {
     private String orderNo;
     private Integer status;
+    private String afterSaleNo;
+    private LocalDateTime refundedAt;
     private Integer totalQuantity;
     private BigDecimal productAmount;
     private BigDecimal memberDiscountAmount;

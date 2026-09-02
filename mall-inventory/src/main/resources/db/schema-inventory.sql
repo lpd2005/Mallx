@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS inventory_operation (
     id BIGINT NOT NULL COMMENT '库存操作流水ID',
     business_no VARCHAR(64) NOT NULL COMMENT '业务单号，例如订单号或入库单号',
     sku_id BIGINT NOT NULL COMMENT 'SKU ID',
-    operation_type TINYINT NOT NULL COMMENT '操作类型：1增加可用，2锁定，3扣减，4释放',
+    operation_type TINYINT NOT NULL COMMENT '操作类型：1增加可用，2锁定，3扣减，4释放，5售后回补',
     quantity INT NOT NULL COMMENT '操作数量，必须大于0',
     before_available INT DEFAULT NULL COMMENT '操作前可用库存',
     after_available INT DEFAULT NULL COMMENT '操作后可用库存',

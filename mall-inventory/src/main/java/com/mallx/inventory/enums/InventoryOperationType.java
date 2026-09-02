@@ -12,7 +12,9 @@ public enum InventoryOperationType {
     /** 支付或履约确认后最终扣减锁定库存。 */
     DEDUCT(3),
     /** 订单取消后释放锁定库存。 */
-    RELEASE(4);
+    RELEASE(4),
+    /** 售后验收后回补可用库存，不冲销历史累计已售数量。 */
+    AFTER_SALE_RESTOCK(5);
 
     /** 数据库存储值。 */
     private final int value;

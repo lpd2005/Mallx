@@ -129,6 +129,25 @@ public class InventoryStockServiceImpl extends ServiceImpl<InventoryStockMapper,
         return finishOperation(operation, requireStock(skuId));
     }
 
+    /** 售后回补与原订单锁定、扣减使用不同流水类型，不影响原库存幂等记录。 */
+    @Override
+    @Transactional
+    public InventoryStockVO restockAfterSale(Long skuId, int quantity, String afterSaleNo) {
+        validate(skuId, quantity, afterSaleNo);
+        requireStock(skuId);
+        InventoryOperation operation = beginOperation(skuId, quantity, afterSaleNo,
+                InventoryOperationType.AFTER_SALE_RESTOCK, "售后回补可销售库存");
+        if (operation == null) {
+            return getStock(skuId);
+        }
+        boolean updated = lambdaUpdate().eq(InventoryStock::getSkuId, skuId)
+                .setSql("available_stock = available_stock + " + quantity).update();
+        if (!updated) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "SKU库存不存在");
+        }
+        return finishOperation(operation, requireStock(skuId));
+    }
+
     /** 先以唯一业务键插入处理中流水，插入失败表示相同操作已经完成。 */
     private InventoryOperation beginOperation(Long skuId, int quantity, String businessNo,
                                                InventoryOperationType type, String remark) {
@@ -161,6 +180,7 @@ public class InventoryStockServiceImpl extends ServiceImpl<InventoryStockMapper,
         InventoryOperationType type = operationType(operation.getOperationType());
         switch (type) {
             case INCREASE_AVAILABLE -> beforeAvailable -= quantity;
+            case AFTER_SALE_RESTOCK -> beforeAvailable -= quantity;
             case LOCK -> { beforeAvailable += quantity; beforeLocked -= quantity; }
             case DEDUCT -> { beforeLocked += quantity; beforeSold -= quantity; }
             case RELEASE -> { beforeLocked += quantity; beforeAvailable -= quantity; }

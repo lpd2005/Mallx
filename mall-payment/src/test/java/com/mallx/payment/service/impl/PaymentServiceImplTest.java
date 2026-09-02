@@ -85,6 +85,25 @@ class PaymentServiceImplTest {
         verify(orderService, never()).markPaid(any(), any(), any());
     }
 
+    @Test
+    void queryingRefundedPaymentMustNotCloseItAsExpired() {
+        PaymentRecord payment = pending();
+        payment.setStatus(PaymentStatus.REFUNDED.getValue());
+        when(mapper.selectByPaymentNoForUpdate("PAY1")).thenReturn(payment);
+        PaymentVO result = service.getPayment(1L, "PAY1");
+        assertEquals(PaymentStatus.REFUNDED.getValue(), result.getStatus());
+        verifyNoInteractions(orderService);
+        verify(mapper, never()).updateById(any(PaymentRecord.class));
+    }
+
+    @Test
+    void lockedPaymentQueryStillEnforcesOwnership() {
+        when(mapper.selectByPaymentNoForUpdate("PAY1")).thenReturn(pending());
+        assertThrows(com.mallx.common.exception.BusinessException.class,
+                () -> service.getPayment(2L, "PAY1"));
+        verifyNoInteractions(orderService);
+    }
+
     private PaymentRecord pending() {
         PaymentRecord p = new PaymentRecord();
         p.setPaymentNo("PAY1");

@@ -103,12 +103,11 @@ public class PaymentServiceImpl extends ServiceImpl<PaymentRecordMapper, Payment
 
     private PaymentRecord requireOwned(Long uid, String no) {
         requireUser(uid);
-        PaymentRecord p =
-                lambdaQuery()
-                        .eq(PaymentRecord::getPaymentNo, requireNo(no))
-                        .eq(PaymentRecord::getUserId, uid)
-                        .one();
-        if (p == null) throw new BusinessException(ResultCode.NOT_FOUND, "支付单不存在");
+        // getPayment可能关闭过期单，因此也必须锁行，避免用旧快照覆盖已支付或已退款状态。
+        PaymentRecord p = paymentMapper.selectByPaymentNoForUpdate(requireNo(no));
+        if (p == null || !uid.equals(p.getUserId())) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "支付单不存在");
+        }
         return p;
     }
 

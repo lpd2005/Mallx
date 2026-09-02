@@ -21,4 +21,7 @@ public interface InventoryStockService extends IService<InventoryStock> {
     InventoryStockVO deductStock(Long skuId, int quantity, String businessNo);
     /** 订单取消时将锁定库存释放回可用库存。 */
     InventoryStockVO releaseStock(Long skuId, int quantity, String businessNo);
+
+    /** 整单售后回补可销售库存；售后单号作为幂等业务号，历史累计已售数量保持不变。 */
+    InventoryStockVO restockAfterSale(Long skuId, int quantity, String afterSaleNo);
 }
