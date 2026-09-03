@@ -14,6 +14,7 @@
                  JOIN auth_role_permission arp ON arp.permission_id = ap.id
                  JOIN auth_account_role aar ON aar.role_id = arp.role_id
                  JOIN auth_role ar ON ar.id = aar.role_id
+                 JOIN auth_account account ON account.id = aar.account_id AND account.status = 1
         WHERE aar.account_id = #{accountId}
           AND ar.status = 1
     </select>

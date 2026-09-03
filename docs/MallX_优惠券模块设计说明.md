@@ -413,7 +413,7 @@ POST /admin/coupon-templates/{templateId}/stop
 GET  /admin/coupon-templates
 ```
 
-当前模板管理接口只完成登录态校验。具体的运营角色和优惠券管理权限需要在 `mall-admin` 与RBAC接入时进一步收紧。
+模板管理 Controller 已迁入 `mall-admin`，路径保持 `/admin/coupon-templates`，统一要求 `admin:access` 与 `coupon:manage` 权限。业务规则仍在本模块 Service 中。
 
 ## 12. MyBatis-Plus与SQL边界
 
@@ -482,7 +482,7 @@ mvn -pl mallx-application -am test
 - 每人可领取多张同一模板优惠券
 - 多券叠加和最优优惠组合
 - 动态有效期，例如领取后7天有效
-- `mall-admin`运营权限控制
+- 更细粒度的运营数据范围控制（`mall-admin`功能权限已接入）
 - 与 `mall-order` 的完整下单、取消和超时关闭联调
 
 当前实现先保证普通领取、优惠计算、订单状态接口和MySQL并发正确性，为后续订单闭环和高并发领取升级提供稳定基础。

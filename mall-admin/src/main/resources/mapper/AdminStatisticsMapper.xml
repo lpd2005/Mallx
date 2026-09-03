@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mallx.admin.mapper.AdminStatisticsMapper">
+    <!-- 各事实表分别聚合，避免订单关联多条明细后把订单金额重复累加。 -->
+    <select id="selectSummary" resultType="com.mallx.admin.vo.AdminDashboardVO">
+        SELECT
+            (SELECT COUNT(*) FROM auth_account) AS user_count,
+            (SELECT COUNT(*) FROM auth_account WHERE created_at &gt;= #{start} AND created_at &lt; #{end}) AS new_user_count,
+            (SELECT COUNT(*) FROM mall_order WHERE created_at &gt;= #{start} AND created_at &lt; #{end}) AS order_count,
+            (SELECT COALESCE(SUM(pay_amount), 0) FROM mall_order WHERE created_at &gt;= #{start} AND created_at &lt; #{end}) AS order_amount,
+            (SELECT COUNT(*) FROM mall_order WHERE paid_at &gt;= #{start} AND paid_at &lt; #{end}) AS paid_order_count,
+            (SELECT COALESCE(SUM(pay_amount), 0) FROM mall_order WHERE paid_at &gt;= #{start} AND paid_at &lt; #{end}) AS paid_amount,
+            (SELECT COALESCE(SUM(amount), 0) FROM payment_refund WHERE refunded_at &gt;= #{start} AND refunded_at &lt; #{end}) AS refund_amount
+    </select>
+    <!-- 销量按SKU订单快照统计；已整单退款不计，售后处理中仍计入，退款完成后榜单会回溯变化。 -->
+    <select id="selectTopProducts" resultType="com.mallx.admin.vo.AdminTopProductVO">
+        SELECT item.sku_id, MAX(item.sku_name) AS sku_name, SUM(item.quantity) AS quantity
+        FROM order_item item
+        JOIN mall_order orders ON orders.id = item.order_id
+        WHERE orders.paid_at &gt;= #{start} AND orders.paid_at &lt; #{end}
+          AND orders.status != 8
+        GROUP BY item.sku_id
+        ORDER BY quantity DESC, item.sku_id ASC
+        LIMIT #{limit}
+    </select>
+</mapper>

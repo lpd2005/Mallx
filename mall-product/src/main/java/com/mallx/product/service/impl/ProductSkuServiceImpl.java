@@ -93,6 +93,14 @@ public class ProductSkuServiceImpl extends ServiceImpl<ProductSkuMapper, Product
         return sku;
     }
 
+    @Override
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public ProductSku lockSku(Long skuId) {
+        ProductSku sku = productSkuMapper.selectByIdForUpdate(skuId);
+        if (sku == null) throw new BusinessException(ResultCode.NOT_FOUND, "SKU不存在");
+        return sku;
+    }
+
     /** 查询指定已上架SPU的可售SKU。 */
     @Override
     public List<SkuVO> listBySpu(Long spuId) {

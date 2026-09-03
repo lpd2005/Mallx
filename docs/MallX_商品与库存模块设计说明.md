@@ -69,7 +69,7 @@ GET /products/{spuId}/skus
 GET /products/skus/{skuId}
 ```
 
-分类、品牌、SPU、SKU 的创建和修改已经提供 Service 方法，后续由带权限控制的 `mall-admin` 调用，不直接暴露无权限保护的管理接口。
+分类、品牌、SPU、SKU 的创建和修改由 `mall-admin` 复用本模块 Service，并统一校验 `admin:access` 与 `product:manage` 权限。
 
 ## 4. 库存模型
 
@@ -198,7 +198,7 @@ getStock(skuId)
 
 ```http
 GET /inventory/skus/{skuId}
-GET /inventory/operations?businessNo={businessNo}
+GET /admin/inventory/operations?businessNo={businessNo}
 ```
 
 写操作由后台入库、订单和秒杀模块直接调用 `InventoryStockService`，避免用户绕过业务流程直接修改库存。
@@ -214,7 +214,7 @@ GET /inventory/operations?businessNo={businessNo}
 | SPU | 状态为草稿，并且没有SKU |
 | SKU | 状态为草稿，即从未上架 |
 
-分类、品牌、SPU和SKU的删除方法由各自 Service 提供。当前前台商品 Controller 保持只读，后续由 `mall-admin` 在完成权限校验后调用这些删除方法。
+分类、品牌、SPU和SKU的删除方法由各自 Service 提供，前台 Controller 保持只读。`mall-admin` 已提供受权限保护的物理删除接口；SKU已有库存记录时拒绝删除，后台不允许已上架商品退回草稿。删除与首次入库通过SKU行锁串行化。
 
 商品模块内部通过外键约束分类、品牌、SPU和SKU的关联，业务检查负责返回清晰提示，数据库外键负责并发情况下的最终完整性保护。
 

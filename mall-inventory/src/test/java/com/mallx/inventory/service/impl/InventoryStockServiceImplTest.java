@@ -80,7 +80,8 @@ class InventoryStockServiceImplTest {
         InventoryStockVO result = stockService.increaseAvailable(SKU_ID, 20, "INBOUND-1001", "首次入库");
 
         assertEquals(20, result.getAvailableStock());
-        verify(skuService).requireSku(SKU_ID);
+        // 入库需锁定SKU，和后台删除串行化，不再使用普通只读校验。
+        verify(skuService).lockSku(SKU_ID);
         verify(stockMapper).insertIfAbsent(SKU_ID);
     }
 

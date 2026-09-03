@@ -63,7 +63,8 @@ public class InventoryStockServiceImpl extends ServiceImpl<InventoryStockMapper,
     @Transactional
     public InventoryStockVO increaseAvailable(Long skuId, int quantity, String businessNo, String remark) {
         validate(skuId, quantity, businessNo);
-        skuService.requireSku(skuId);
+        // 与后台删除共用SKU行锁，避免校验后SKU被删除却仍创建了库存。
+        skuService.lockSku(skuId);
         inventoryStockMapper.insertIfAbsent(skuId);
         InventoryOperation operation = beginOperation(
                 skuId, quantity, businessNo, InventoryOperationType.INCREASE_AVAILABLE, remark);

@@ -354,7 +354,7 @@ POST /admin/after-sales/{afterSaleNo}/refund
 }
 ```
 
-所有管理接口显式检查 `after-sale:manage` 权限，单纯登录不够。需要在现有 `auth_permission` 中配置该权限编码，通过 `auth_role_permission` 与 `auth_account_role` 授予指定账号；本次不会自动给任意账号授予权限。
+售后管理 Controller 已迁入 `mall-admin`，原 `/admin/after-sales` 路径不变。后台统一要求 `admin:access` 和 `after-sale:manage`，审核、收货和退款同时记录后台审计流水。角色权限初始化见后台模块文档；不会自动给任意账号授予权限。
 
 用户查询与写操作都校验资源归属，列表使用MyBatis-Plus分页，默认每页20条，最多100条。详情附带操作流水，列表不逐条加载流水。
 

@@ -54,7 +54,8 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public void logout() {
         if (currentUserProvider.isLogin()) {
-            log.info("User logout, userId={}", currentUserProvider.requireUserId());
+            // 注销应允许禁用账号清理旧会话，不再触发账号启用状态校验。
+            log.info("User logout, userId={}", StpUtil.getLoginId());
             StpUtil.logout();
         }
     }

@@ -21,6 +21,8 @@ public interface ProductSkuService extends IService<ProductSku> {
     void changeStatus(Long skuId, Integer status);
     /** 获取必须存在的SKU，供库存等模块调用。 */
     ProductSku requireSku(Long skuId);
+    /** 在已有事务中锁定SKU行，协调后台删除与首次入库。 */
+    ProductSku lockSku(Long skuId);
     /** 查询指定已上架SPU下的已上架SKU。 */
     List<SkuVO> listBySpu(Long spuId);
     /** 查询前台可见的已上架SKU。 */

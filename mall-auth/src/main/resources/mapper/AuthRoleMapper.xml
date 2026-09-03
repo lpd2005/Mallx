@@ -8,6 +8,7 @@
         SELECT ar.role_code
         FROM auth_role ar
         JOIN auth_account_role aar ON aar.role_id = ar.id
+        JOIN auth_account account ON account.id = aar.account_id AND account.status = 1
         WHERE aar.account_id = #{accountId}
           AND ar.status = 1
     </select>
