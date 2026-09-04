@@ -1,11 +1,18 @@
 package com.mallx.product.controller;
 
+import com.mallx.common.annotation.Public;
+import com.mallx.common.result.PageResult;
 import com.mallx.common.result.Result;
+import com.mallx.product.dto.ProductPageQuery;
 import com.mallx.product.service.ProductSkuService;
 import com.mallx.product.service.ProductSpuService;
 import com.mallx.product.vo.SkuVO;
 import com.mallx.product.vo.SpuVO;
+
+import jakarta.validation.Valid;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -21,19 +28,29 @@ public class ProductController {
     private final ProductSpuService spuService;
     private final ProductSkuService skuService;
 
+    /** 游客可用的商品列表，默认第1页、每页20条，仅展示已上架SPU。 */
+    @Public
+    @GetMapping
+    public Result<PageResult<SpuVO>> products(@Valid ProductPageQuery query) {
+        return Result.success(spuService.pageProducts(query));
+    }
+
     /** 查询已上架SPU详情。 */
+    @Public
     @GetMapping("/{spuId}")
     public Result<SpuVO> spu(@PathVariable Long spuId) {
         return Result.success(spuService.getSpu(spuId));
     }
 
     /** 查询指定SPU下的全部已上架SKU。 */
+    @Public
     @GetMapping("/{spuId}/skus")
     public Result<List<SkuVO>> skus(@PathVariable Long spuId) {
         return Result.success(skuService.listBySpu(spuId));
     }
 
     /** 查询已上架SKU详情。 */
+    @Public
     @GetMapping("/skus/{skuId}")
     public Result<SkuVO> sku(@PathVariable Long skuId) {
         return Result.success(skuService.getSku(skuId));

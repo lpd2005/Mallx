@@ -1,9 +1,12 @@
 package com.mallx.product.controller;
 
+import com.mallx.common.annotation.Public;
 import com.mallx.common.result.Result;
 import com.mallx.product.service.ProductCategoryService;
 import com.mallx.product.vo.CategoryVO;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -18,6 +21,9 @@ public class ProductCatalogController {
     private final ProductCategoryService categoryService;
 
     /** 查询启用的商品分类树。 */
+    @Public
     @GetMapping
-    public Result<List<CategoryVO>> categories() { return Result.success(categoryService.categoryTree()); }
+    public Result<List<CategoryVO>> categories() {
+        return Result.success(categoryService.categoryTree());
+    }
 }

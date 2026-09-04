@@ -1,13 +1,16 @@
 package com.mallx.auth.service;
 
 import com.mallx.auth.dto.LoginRequest;
+import com.mallx.auth.dto.RegisterRequest;
 import com.mallx.auth.vo.CurrentUserResponse;
 import com.mallx.auth.vo.LoginResponse;
+import com.mallx.auth.vo.RegisterResponse;
 
-/**
- * 登录会话与认证账号服务。
- */
+/** 登录会话与认证账号服务。 */
 public interface AuthService {
+
+    /** 创建普通账号及用户资料，注册成功后由用户单独登录。 */
+    RegisterResponse register(RegisterRequest request);
 
     /**
      * 校验手机号和密码并创建 Sa-Token 会话。

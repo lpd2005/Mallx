@@ -15,6 +15,12 @@
     <packaging>jar</packaging>
 
     <dependencies>
+        <!-- 注册时调用用户模块初始化资料；mall-user只依赖common，不反向依赖auth。 -->
+        <dependency>
+            <groupId>com.mallx</groupId>
+            <artifactId>mall-user</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>com.mallx</groupId>
             <artifactId>mall-common</artifactId>

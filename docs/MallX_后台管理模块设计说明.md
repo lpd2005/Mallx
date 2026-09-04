@@ -71,7 +71,7 @@ VO使用 `@Builder`，同名属性使用Hutool `BeanUtil` 拷贝。库存 `outOf
 
 没有原生权限注解的后台接口默认拒绝，也不允许使用 `@SaIgnore` 跳过后台鉴权。这是 `SaTokenConfig` 中保留的一项项目安全规则：只检查声明是否存在，注解读取、权限值校验及AND/OR组合由Sa-Token执行。鉴权与前端菜单展示无关，前端隐藏按钮不是安全边界。
 
-同一个 `SaTokenConfig` 按顺序注册三个原生 `SaInterceptor`：第一个检查登录与账号状态，第二个只处理后台准入和声明兜底，第三个执行原生注解鉴权。前两个关闭注解处理，避免重复执行，也保证未登录/禁用账号先被拦截。`/auth/login`、`/auth/logout` 保留原有放行规则。
+同一个 `SaTokenConfig` 按顺序注册三个原生 `SaInterceptor`：第一个检查登录与账号状态，第二个只处理后台准入和声明兜底，第三个执行原生注解鉴权。前两个关闭注解处理，避免重复执行，也保证普通受保护接口的未登录/禁用账号先被拦截。注册、登录、退出和游客商品读取方法通过common中的方法级 `@Public` 跳过第一个拦截器，不再维护公开URL白名单；原生权限注解仍然执行。后台方法禁止标注 `@Public`，误标时由第二个拦截器的声明检查拒绝，详见《MallX_MVP注册与前台浏览说明》。
 
 `AdminPermission`、`AdminPermissionInterceptor` 和 `AdminWebConfiguration` 已移除；售后Controller不再手工检查同一权限，优惠券Controller不再重复检查登录。`StpInterfaceImpl` 仍负责从数据库提供角色和权限，它是Sa-Token的数据来源，不是另一套鉴权实现。
 

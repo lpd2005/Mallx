@@ -1,99 +1,72 @@
 package com.mallx.common.utils;
 
 import cn.hutool.core.util.StrUtil;
-import com.aliyun.oss.ClientBuilderConfiguration;
+
+import com.aliyun.oss.HttpMethod;
 import com.aliyun.oss.OSS;
-import com.aliyun.oss.OSSClientBuilder;
-import com.aliyun.oss.common.auth.CredentialsProviderFactory;
-import com.aliyun.oss.common.auth.EnvironmentVariableCredentialsProvider;
-import com.aliyun.oss.common.comm.SignVersion;
-import com.mallx.common.enums.ResultCode;
-import com.mallx.common.exception.BusinessException;
+import com.aliyun.oss.model.GeneratePresignedUrlRequest;
+import com.aliyun.oss.model.ObjectMetadata;
+import com.mallx.common.oss.AliyunOssConfiguration;
 import com.mallx.common.oss.AliyunOssProperties;
+import com.mallx.common.oss.ImageUploadVO;
+
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
 import java.io.ByteArrayInputStream;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.util.UUID;
+import java.time.Instant;
+import java.util.Date;
 
-/**
- * 阿里云 OSS 文件上传工具。
- *
- * <p>对象按 {@code yyyy/MM} 归档，文件名使用 UUID，避免用户上传的同名文件相互覆盖。</p>
- */
-@Slf4j
+/** OSS存储工具；验证和Key生成由ImageUploadService处理，客户端由Spring统一释放。 */
 @Component
 @RequiredArgsConstructor
 public class AliyunOssUtil {
-
-    private static final DateTimeFormatter DIRECTORY_FORMATTER = DateTimeFormatter.ofPattern("yyyy/MM");
-
-    /** 从配置文件读取的 OSS 非敏感连接参数。 */
     private final AliyunOssProperties properties;
+    private final ObjectProvider<OSS> clientProvider;
 
-    /**
-     * 上传文件并返回其访问地址。
-     *
-     * @param content 文件二进制内容
-     * @param originalFilename 用户上传的原始文件名
-     * @return 已上传文件的访问地址
-     */
-    public String upload(byte[] content, String originalFilename) throws Exception {
-        validateConfiguration();
-        String objectName = buildObjectName(originalFilename);
-        EnvironmentVariableCredentialsProvider credentialsProvider =
-                CredentialsProviderFactory.newEnvironmentVariableCredentialsProvider();
-
-        ClientBuilderConfiguration clientConfiguration = new ClientBuilderConfiguration();
-        clientConfiguration.setSignatureVersion(SignVersion.V4);
-        OSS ossClient = OSSClientBuilder.create()
-                .endpoint(properties.getEndpoint())
-                .credentialsProvider(credentialsProvider)
-                .clientConfiguration(clientConfiguration)
-                .region(properties.getRegion())
-                .build();
-
+    /** 只接收服务端生成的Key及已验证、重新编码的图片，不能透传客户端的任意Key。 */
+    public ImageUploadVO upload(byte[] content, String objectKey, String contentType) {
         try {
-            ossClient.putObject(properties.getBucketName(), objectName, new ByteArrayInputStream(content));
-            return buildAccessUrl(objectName);
+            // 提前生成展示链接，配置/签名失败时不写对象。签名生成不查询OSS。
+            ImageUploadVO result = accessUrl(objectKey);
+            ObjectMetadata metadata = new ObjectMetadata();
+            metadata.setContentType(contentType);
+            metadata.setContentLength(content.length);
+            clientProvider
+                    .getObject()
+                    .putObject(
+                            properties.getBucketName(),
+                            objectKey,
+                            new ByteArrayInputStream(content),
+                            metadata);
+            return result;
         } catch (Exception exception) {
-            log.error("Failed to upload file to OSS, objectName={}", objectName, exception);
-            throw new BusinessException(ResultCode.INTERNAL_ERROR, "文件上传失败");
-        } finally {
-            ossClient.shutdown();
+            // 全局异常处理返回HTTP500，不向前端暴露密钥、签名或SDK错误细节。
+            throw new IllegalStateException("OSS图片上传失败", exception);
         }
     }
 
-    /**
-     * 以日期目录与随机文件名生成对象键，仅保留原始文件的扩展名。
-     */
-    private String buildObjectName(String originalFilename) {
-        String extension = StrUtil.emptyToDefault(
-                StrUtil.subAfter(originalFilename == null ? "" : originalFilename, ".", true), "");
-        String filename = UUID.randomUUID().toString().replace("-", "");
-        String objectFilename = extension.isBlank() ? filename : filename + "." + extension;
-        return LocalDate.now().format(DIRECTORY_FORMATTER) + "/" + objectFilename;
-    }
-
-    /**
-     * 根据 endpoint、Bucket 与对象键组合标准访问地址。
-     */
-    private String buildAccessUrl(String objectName) {
-        String endpoint = properties.getEndpoint();
-        String scheme = endpoint.startsWith("https://") ? "https://" : "http://";
-        String host = endpoint.replaceFirst("^https?://", "");
-        return scheme + properties.getBucketName() + "." + host + "/" + objectName;
-    }
-
-    /**
-     * 在发起网络调用前校验本机私有配置是否填写完整。
-     */
-    private void validateConfiguration() {
-        if (StrUtil.hasBlank(properties.getEndpoint(), properties.getBucketName(), properties.getRegion())) {
-            throw new IllegalStateException("阿里云 OSS 配置不完整，请检查 application-local.yml");
+    /** 调用方必须先检查Key所属目录和用户权限，不能提供任意对象的公开签名入口。 */
+    public ImageUploadVO accessUrl(String objectKey) {
+        AliyunOssConfiguration.validate(properties);
+        if (StrUtil.isNotBlank(properties.getPublicBaseUrl())) {
+            String baseUrl = properties.getPublicBaseUrl().replaceAll("/+$", "");
+            return ImageUploadVO.builder()
+                    .objectKey(objectKey)
+                    .url(baseUrl + "/" + objectKey)
+                    .build();
         }
+        Instant expiresAt = Instant.now().plusSeconds(properties.getSignedUrlSeconds());
+        GeneratePresignedUrlRequest request =
+                new GeneratePresignedUrlRequest(
+                        properties.getBucketName(), objectKey, HttpMethod.GET);
+        request.setExpiration(Date.from(expiresAt));
+        return ImageUploadVO.builder()
+                .objectKey(objectKey)
+                .expiresAt(expiresAt)
+                .url(clientProvider.getObject().generatePresignedUrl(request).toString())
+                .build();
     }
 }

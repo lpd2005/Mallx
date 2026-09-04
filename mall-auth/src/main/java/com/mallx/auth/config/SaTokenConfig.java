@@ -6,8 +6,12 @@ import cn.dev33.satoken.exception.NotPermissionException;
 import cn.dev33.satoken.interceptor.SaInterceptor;
 import cn.dev33.satoken.stp.StpUtil;
 import cn.dev33.satoken.strategy.SaAnnotationStrategy;
+
+import com.mallx.common.annotation.Public;
 import com.mallx.common.context.CurrentUserProvider;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
@@ -25,12 +29,16 @@ public class SaTokenConfig implements WebMvcConfigurer {
         registry.addInterceptor(
                         new SaInterceptor(
                                         handler -> {
+                                            // 公开接口随Controller方法声明，不再维护URL白名单。
+                                            if (handler instanceof HandlerMethod method
+                                                    && method.hasMethodAnnotation(Public.class)) {
+                                                return;
+                                            }
                                             StpUtil.checkLogin();
                                             currentUserProvider.requireUserId();
                                         })
                                 .isAnnotation(false))
                 .addPathPatterns("/**")
-                .excludePathPatterns("/auth/login", "/auth/logout")
                 .order(0);
 
         registry.addInterceptor(
@@ -44,15 +52,13 @@ public class SaTokenConfig implements WebMvcConfigurer {
                 .order(10);
 
         // 注解读取、类与方法权限组合、AND/OR判断全部交给Sa-Token，不再手工解析权限值。
-        registry.addInterceptor(new SaInterceptor())
-                .addPathPatterns("/**")
-                .excludePathPatterns("/auth/login", "/auth/logout")
-                .order(20);
+        registry.addInterceptor(new SaInterceptor()).addPathPatterns("/**").order(20);
     }
 
-    /** 仅保留项目的默认拒绝规则：后台必须声明原生权限注解，不能用SaIgnore跳过鉴权。 */
+    /** 后台必须声明原生权限注解，不能用Public或SaIgnore绕过鉴权。 */
     private void requireAdminPermissionDeclaration(Object handler) {
         if (!(handler instanceof HandlerMethod method)
+                || method.hasMethodAnnotation(Public.class)
                 || !SaAnnotationStrategy.instance.isAnnotationPresent.apply(
                         method.getMethod(), SaCheckPermission.class)
                 || SaAnnotationStrategy.instance.isAnnotationPresent.apply(

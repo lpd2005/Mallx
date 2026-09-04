@@ -2,6 +2,7 @@ package com.mallx.product.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.json.JSONUtil;
+
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.mallx.common.enums.ResultCode;
 import com.mallx.common.exception.BusinessException;
@@ -12,9 +13,11 @@ import com.mallx.product.enums.ProductStatus;
 import com.mallx.product.mapper.ProductSkuMapper;
 import com.mallx.product.service.ProductSkuService;
 import com.mallx.product.service.ProductSpuService;
-import com.mallx.product.vo.SkuVO;
 import com.mallx.product.vo.CartProductVO;
+import com.mallx.product.vo.SkuVO;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -80,8 +83,7 @@ public class ProductSkuServiceImpl extends ServiceImpl<ProductSkuMapper, Product
             throw new BusinessException(ResultCode.BAD_REQUEST, "SKU状态不正确");
         }
         ProductSku sku = requireSku(skuId);
-        lambdaUpdate().eq(ProductSku::getId, skuId)
-                .set(ProductSku::getStatus, status).update();
+        lambdaUpdate().eq(ProductSku::getId, skuId).set(ProductSku::getStatus, status).update();
         refreshPriceRange(sku.getSpuId());
     }
 
@@ -105,10 +107,14 @@ public class ProductSkuServiceImpl extends ServiceImpl<ProductSkuMapper, Product
     @Override
     public List<SkuVO> listBySpu(Long spuId) {
         spuService.getSpu(spuId);
-        return lambdaQuery().eq(ProductSku::getSpuId, spuId)
+        return lambdaQuery()
+                .eq(ProductSku::getSpuId, spuId)
                 .eq(ProductSku::getStatus, ProductStatus.ON_SHELF.getValue())
                 .orderByAsc(ProductSku::getSalePrice)
-                .list().stream().map(this::toVO).toList();
+                .list()
+                .stream()
+                .map(this::toVO)
+                .toList();
     }
 
     /** 查询前台可见SKU详情。 */
@@ -117,6 +123,8 @@ public class ProductSkuServiceImpl extends ServiceImpl<ProductSkuMapper, Product
         ProductSku sku = requireSku(skuId);
         if (!ProductStatus.ON_SHELF.matches(sku.getStatus()))
             throw new BusinessException(ResultCode.NOT_FOUND, "SKU不存在或未上架");
+        // 单独查询SKU也必须检查所属SPU，避免游客绕过SPU详情看到草稿或已下架商品。
+        spuService.getSpu(sku.getSpuId());
         return toVO(sku);
     }
 
@@ -126,10 +134,8 @@ public class ProductSkuServiceImpl extends ServiceImpl<ProductSkuMapper, Product
         if (skuIds == null || skuIds.isEmpty()) {
             return List.of();
         }
-        List<Long> validSkuIds = skuIds.stream()
-                .filter(skuId -> skuId != null && skuId > 0)
-                .distinct()
-                .toList();
+        List<Long> validSkuIds =
+                skuIds.stream().filter(skuId -> skuId != null && skuId > 0).distinct().toList();
         if (validSkuIds.isEmpty()) {
             return List.of();
         }
@@ -137,17 +143,19 @@ public class ProductSkuServiceImpl extends ServiceImpl<ProductSkuMapper, Product
     }
 
     private void validateRequest(Long excludedId, SkuRequest request) {
-        if (request.getMarketPrice() != null && request.getMarketPrice().compareTo(request.getSalePrice()) < 0)
+        if (request.getMarketPrice() != null
+                && request.getMarketPrice().compareTo(request.getSalePrice()) < 0)
             throw new BusinessException(ResultCode.BAD_REQUEST, "划线价不能低于销售价");
         try {
             JSONUtil.parseObj(request.getSpecJson());
         } catch (Exception exception) {
             throw new BusinessException(ResultCode.BAD_REQUEST, "SKU规格必须是JSON对象");
         }
-        long count = lambdaQuery()
-                .eq(ProductSku::getSkuCode, request.getSkuCode().trim())
-                .ne(excludedId != null, ProductSku::getId, excludedId)
-                .count();
+        long count =
+                lambdaQuery()
+                        .eq(ProductSku::getSkuCode, request.getSkuCode().trim())
+                        .ne(excludedId != null, ProductSku::getId, excludedId)
+                        .count();
         if (count > 0) throw new BusinessException(ResultCode.BAD_REQUEST, "SKU编码已存在");
     }
 
@@ -160,14 +168,24 @@ public class ProductSkuServiceImpl extends ServiceImpl<ProductSkuMapper, Product
 
     /** 汇总当前SPU已上架SKU的价格区间。 */
     private void refreshPriceRange(Long spuId) {
-        List<BigDecimal> prices = lambdaQuery().eq(ProductSku::getSpuId, spuId)
-                .eq(ProductSku::getStatus, ProductStatus.ON_SHELF.getValue())
-                .select(ProductSku::getSalePrice)
-                .list().stream().map(ProductSku::getSalePrice).sorted(Comparator.naturalOrder()).toList();
+        List<BigDecimal> prices =
+                lambdaQuery()
+                        .eq(ProductSku::getSpuId, spuId)
+                        .eq(ProductSku::getStatus, ProductStatus.ON_SHELF.getValue())
+                        .select(ProductSku::getSalePrice)
+                        .list()
+                        .stream()
+                        .map(ProductSku::getSalePrice)
+                        .sorted(Comparator.naturalOrder())
+                        .toList();
         BigDecimal min = prices.isEmpty() ? null : prices.get(0);
         BigDecimal max = prices.isEmpty() ? null : prices.get(prices.size() - 1);
-        spuService.lambdaUpdate().eq(ProductSpu::getId, spuId)
-                .set(ProductSpu::getMinPrice, min).set(ProductSpu::getMaxPrice, max).update();
+        spuService
+                .lambdaUpdate()
+                .eq(ProductSpu::getId, spuId)
+                .set(ProductSpu::getMinPrice, min)
+                .set(ProductSpu::getMaxPrice, max)
+                .update();
     }
 
     private SkuVO toVO(ProductSku sku) {
