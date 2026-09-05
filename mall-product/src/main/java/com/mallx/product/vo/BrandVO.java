@@ -9,10 +9,13 @@ import lombok.Data;
 public class BrandVO {
     /** 品牌ID。 */
     private Long id;
+
     /** 品牌名称。 */
     private String brandName;
-    /** Logo OSS对象Key。 */
+
+    /** 图片完整访问URL；沿用OssKey字段名，不再保存对象Key。空值表示未设置图片。 */
     private String logoOssKey;
+
     /** 品牌介绍。 */
     private String description;
 }

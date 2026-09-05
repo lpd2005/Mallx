@@ -10,7 +10,10 @@ import lombok.*;
 public class AdminBrandVO {
     private Long id;
     private String brandName;
+
+    /** 图片完整访问URL；沿用OssKey字段名，不再保存对象Key。空值表示未设置图片。 */
     private String logoOssKey;
+
     private String description;
     private Integer sort;
     private Integer enabled;

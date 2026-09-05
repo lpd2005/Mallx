@@ -1,11 +1,12 @@
 package com.mallx.user.dto;
 
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PastOrPresent;
 import jakarta.validation.constraints.Size;
+
 import lombok.Data;
 
 import java.time.LocalDate;
@@ -19,8 +20,9 @@ public class UpdateUserProfileRequest {
     @Size(max = 32, message = "昵称长度不能超过 32 位")
     private String nickname;
 
-    /** 头像在 OSS 中的对象 Key；空字符串表示清空头像。 */
-    @Size(max = 255, message = "头像对象 Key 长度不能超过 255 位")
+    /** 图片完整访问URL；沿用OssKey字段名，不再保存对象Key。空值表示未设置图片。 */
+    @Size(max = 1024, message = "图片地址长度不能超过1024位")
+    @org.hibernate.validator.constraints.URL(protocol = "https", message = "图片地址必须为完整HTTPS URL")
     private String avatarOssKey;
 
     /** 性别：0 未知、1 男、2 女。 */

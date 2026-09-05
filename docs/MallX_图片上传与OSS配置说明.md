@@ -1,149 +1,122 @@
 # MallX 图片上传与OSS配置说明
 
-## 1. 本次实现
+## 1. 当前方案
 
-采用后端转传：前端发送multipart文件，后端校验并重新编码，再上传阿里云OSS。暂不实现前端直传、STS自动刷新、文件管理表、自动删除或图片审核平台。
+上传图片 → 返回完整公开URL字符串 → 前端通过业务接口保存URL → 查询时原样返回并展示。
 
-- `mall-common/oss`：客户端配置、图片校验、目录隔离、上传结果。
-- `AliyunOssUtil`：调用OSS上传、生成访问链接；OSS客户端由Spring延迟创建并复用，应用关闭时统一shutdown。
-- `mall-admin/AdminFileController`：商品、品牌、分类图片入口，要求`admin:access`与`product:manage`。
-- `mall-user/UserFileController`：登录用户头像入口。
+数据库和Java字段名继续沿用 `avatarOssKey`、`mainImageOssKey`、`imageOssKey`、`iconOssKey`、`logoOssKey`，但现在存的是完整URL，不再是OSS对象Key。购物车展示、订单图片快照和后台查询同样直接使用这个值。
 
-所有上传及刷新链接接口都没有`@Public`。游客能浏览商品，不代表可以上传文件或为任意对象签名。
+已移除上传结果VO、签名到期时间、两个GET图片地址刷新接口，以及上一版商品VO新增的重复URL字段。前端不再读取 `mainImageUrl` 等新增字段，也不再调用签名接口。
 
-## 2. 接口
+商品图和头像均为公开图片，没有私有签名保护。公开读不等于需要公开写：建议Bucket设置为公共读、授权写，或通过更细粒度授权实现。公共读写会使他人绕过后端权限直接上传、覆盖或删除OSS对象，并可能产生费用。后端的登录校验无法保护公共读写的Bucket。本次代码不修改云端ACL。
 
-| 方法 | 地址 | 说明 |
+## 2. 上传接口
+
+| 用途 | 方法和路径 | 权限 |
 | --- | --- | --- |
-| POST | /admin/files/images | 上传商品、品牌、分类图片 |
-| GET | /admin/files/images/url?objectKey=... | 管理员刷新商品图片地址 |
-| POST | /users/me/files/avatar | 上传当前用户头像 |
-| GET | /users/me/files/avatar/url?objectKey=... | 刷新当前用户自己上传头像的地址 |
+| 商品、品牌、分类图片 | POST /admin/files/images/upload | 登录、admin:access、product:manage |
+| 用户头像 | POST /users/me/files/avatar/upload | 登录 |
 
-上传类型为`multipart/form-data`，文件字段名称必须为`file`，同时携带登录返回的Token请求头（当前配置为`Authorization`）。不传用户ID、对象Key或上传目录，后端根据登录身份生成。
+原来的POST路径 `/admin/files/images` 和 `/users/me/files/avatar` 也保留，作为同一上传方法的兼容入口。没有新增匿名上传接口。
 
-成功响应示例（Key、签名URL和时间仅示意）：
-
-```json
-{
-  "code": 200,
-  "message": "success",
-  "data": {
-    "objectKey": "avatars/100/2026/09/0123456789abcdef0123456789abcdef.png",
-    "url": "https://images.example.com/avatars/100/2026/09/0123456789abcdef0123456789abcdef.png?签名参数",
-    "expiresAt": "2026-09-04T10:15:00Z"
-  }
-}
-```
-
-业务表只保存`objectKey`，不能保存临时签名URL。头像上传后，将Key传给现有`PUT /users/me`的`avatarOssKey`字段；该接口为完整资料更新，还需填写原有其他必填字段。商品、品牌、分类通过各自管理接口保存对应`*OssKey`字段。
-
-上传本身不自动修改资料，不删除旧图片；取消编辑可能留下未引用文件。本期不做对象删除，后续需按业务引用关系设计清理机制，不能直接给整个图片目录配置短期过期删除。
-
-## 3. 图片校验和目录规则
-
-- 只支持JPEG、PNG，暂不支持GIF、WebP、SVG。
-- 原文件与重新编码后的文件均不超过5MB；整个multipart请求不超过6MB。
-- 宽高各不超过8192，总像素不超过1600万。先检查尺寸再解码，降低图片解压导致的内存风险。
-- 读取文件流也有大小上限，不仅依赖前端声明的文件大小。
-- 根据实际图片内容检测格式，不相信原始文件名和请求Content-Type。
-- 解码并重新编码后上传，丢弃尾随数据和原始元数据。JPEG可能再次有损压缩；不保留EXIF方向等元数据，前端应先校正手机照片方向。
-- 后端生成UUID文件名，并明确设置OSS Content-Type和Content-Length。
-
-目录格式：
+请求为 `multipart/form-data`，文件字段名为 `file`。成功返回HTTP 200，响应体直接是字符串，例如：
 
 ```text
-products/{管理员ID}/yyyy/MM/{uuid}.jpg或.png
-avatars/{用户ID}/yyyy/MM/{uuid}.jpg或.png
+https://images.example.com/2026/09/0123456789abcdef0123456789abcdef.png
 ```
 
-头像刷新接口只允许当前用户目录；后台刷新接口只允许商品目录。Key需匹配完整格式，不接受完整URL、路径穿越或查询参数。管理员可管理商品目录下其他管理员上传的图片，但不能通过商品接口签发用户头像。
+不是 `Result<String>`，不包含 `data`、`objectKey` 或 `expiresAt`。失败仍由现有全局异常处理返回错误信息，前端先检查HTTP状态。
 
-刷新接口只生成链接，不执行HeadObject，因此不证明对象一定存在。新接口也不为原先任意格式的历史Key签名，历史文件需另行规划兼容策略。
+```javascript
+const form = new FormData();
+form.append('file', file);
+const response = await fetch('/admin/files/images/upload', {
+  method: 'POST',
+  headers: { Authorization: token },
+  body: form
+});
+if (!response.ok) {
+  throw new Error(await response.text());
+}
+const imageUrl = await response.text();
+// 商品编辑表单中的旧字段现在直接存URL。
+productForm.mainImageOssKey = imageUrl;
+```
 
-## 4. 本地配置
+不要手动设置multipart的Content-Type，浏览器会生成boundary；上传请求无需指定Accept: application/json。查询商品后直接用 `product.mainImageOssKey` 作为img的src。头像上传后，通过现有 `PUT /users/me` 将URL放入 `avatarOssKey`，并填写该完整资料更新接口其他必填字段。
 
-不要提交AccessKey，实际私密配置仍由你在`mallx-application/src/main/resources/application-local.yml`维护。本次没有改动该文件。
+上传本身不更新业务表，也不删除旧图片；取消编辑可能留下未引用对象。
 
-在已有`mall`节点中合并下面配置，不要重复创建同名顶层节点：
+## 3. 代码结构与保留的校验
+
+- Controller：接收MultipartFile，保留原有鉴权，返回String。
+- ImageUploadService：校验图片，然后调用工具类。
+- AliyunOssUtil：简单的 `upload(byte[] content, String originalFilename)`，生成日期目录和UUID文件名，上传后返回完整URL。
+- AliyunOssConfiguration：保留延迟创建、复用客户端和关闭释放，不再配置临时GET签名。
+
+保留真实JPEG/PNG检测、重新编码、5MB文件上限、6MB请求上限、宽高8192及1600万像素限制，不直接相信文件名或Content-Type。图片解码和重新编码会丢弃原始元数据。新文件统一保存在 `yyyy/MM/uuid.jpg或.png`；旧products、avatars目录中的文件不会移动或删除。
+
+## 4. OSS配置
+
+在本机application-local.yml已有的mall节点中合并配置，不要重复创建同名节点。本次未修改你的本机配置。
 
 ```yaml
 mall:
   oss:
-    # 示例：需要事先在OSS绑定该域名并配置HTTPS证书，不能原样使用示例域名。
-    endpoint: https://images.example.com
+    endpoint: https://oss-cn-hangzhou.aliyuncs.com
     bucket-name: your-bucket-name
     region: cn-hangzhou
-    # 留空：默认私有Bucket，返回限时GET签名链接。
-    public-base-url: ""
-    signed-url-seconds: 900
 ```
 
-`application.yml`将`mall.oss.*`映射到`mallx.aliyun.oss.*`，对应`AliyunOssProperties`。Endpoint和Bucket地域必须一致；Endpoint必须包含HTTPS、不能包含Bucket对象路径、查询参数或末尾斜杠。
+上面均为示例，替换成自己的地域、Bucket和Endpoint。不再单独配置图片访问域名，工具类只根据Endpoint生成完整地址：
 
-若账号允许使用标准公网域名，可用`https://oss-cn-hangzhou.aliyuncs.com`，不要手工添加Bucket前缀。注意：自2025年3月20日起新开通OSS服务的用户，其中国内地Bucket通过默认公网域名调用数据API会受限，应使用自定义域名；此前已开通用户与内网域名不受该公告影响。参见[阿里云域名策略公告](https://www.alibabacloud.com/zh/notice/oss_update_notice_policy_change_in_calling_data_api_operations_via_the_default_public_domain_name_45a)。
+- 标准Endpoint：返回 `https://Bucket.oss-cn-地域.aliyuncs.com/对象Key`。
+- 自定义Endpoint：直接用 `Endpoint/对象Key`，不会重复拼接Bucket。
+- 内网Endpoint：不支持，上传前会拒绝；请使用浏览器可访问的公网或已绑定并配置HTTPS的自定义Endpoint。
 
-默认签名预览需要浏览器可访问的公网或自定义Endpoint。如果用内网Endpoint上传，必须另行配置已可公开访问的`public-base-url`，不能把内网签名链接返回给公网浏览器。
+是否能用默认公网域名取决于OSS账号及地域政策；受限制时配置自定义域名。参见[阿里云域名策略公告](https://www.alibabacloud.com/zh/notice/oss_update_notice_policy_change_in_calling_data_api_operations_via_the_default_public_domain_name_45a)。填写域名不等于自动完成HTTPS、DNS或访问权限配置。
 
-### 凭证
-
-在IDEA实际启动配置的Environment variables或部署进程环境中设置：
+使用环境变量提供授权上传凭证，不能把AccessKey交给前端：
 
 ```text
 OSS_ACCESS_KEY_ID=RAM用户的AccessKeyId
 OSS_ACCESS_KEY_SECRET=RAM用户的AccessKeySecret
 ```
 
-SDK读取进程环境变量，不是Spring配置项，也不是`-D`参数。设置后重新启动应用。使用STS临时凭证时还需`OSS_SESSION_TOKEN`；当前环境变量提供器不自动续期，实际URL也可能随STS凭证提前失效。
+STS临时凭证还需要 `OSS_SESSION_TOKEN`。上传操作仍使用SDK V4请求签名；取消的是供浏览器读取私有图片的临时URL签名，不是删除上传凭证。RAM账号只授予所需上传目录的PutObject权限，不需要Bucket管理、列表和删除全权限。
 
-使用专用RAM用户，上传授予目标目录`oss:PutObject`；私有链接成功读取还需`oss:GetObject`。当前不需要ListBucket、DeleteObject或管理员全权限。RAM资源范围应与上述products、avatars目录一致。不要把Bucket改为公共读写。
+旧配置 `public-base-url`、`product-public-base-url`、`signed-url-seconds` 已不再使用。如果本机配置还保留这些项，可以删除；本次未改动本机私有配置文件。
 
-SDK配置了连接超时5秒、读写超时15秒、连接池等待5秒、最大连接数50，并使用V4签名。未配置OSS不会阻止其他模块启动，实际上传/刷新时才校验。
+## 5. 数据库升级与旧数据
 
-### 公开图片或CDN模式
+新建表脚本已把6个图片字段扩容为VARCHAR(1024)，DTO同步限制1024字符，并要求非空图片地址为完整HTTPS URL。字段名不改，避免额外的表字段重命名和接口字段变更。
 
-若已配置好允许访问的图片域名或CDN，可填写：
+已有数据库先备份相关表，再执行：
 
-```yaml
-mall:
-  oss:
-    public-base-url: https://cdn.example.com
+```text
+mall-common/src/main/resources/db/migration-image-url-v1.sql
 ```
 
-此模式直接返回`public-base-url/objectKey`，`expiresAt`为null，不再生成签名，也不会自动更改Bucket ACL或配置CDN。私有Bucket需由你配置CDN私有回源等访问机制；仅填写域名不等于获得访问权限。此配置同时影响商品图和头像，使用前要确认均适合公开展示。
+该脚本只扩容字段及更新COMMENT，不清空或自动转换数据；MySQL DDL会隐式提交。本次未在你的数据库执行脚本。
 
-现有商品、品牌、分类及资料VO仍保留`*OssKey`字段，没有改成持久化URL。前台展示公开图片可使用配置好的图片域名拼接Key；私有商品图目前仅提供后台预览刷新，不提供游客任意Key签名接口。若后续选择让游客查看私有商品图，应在商品查询中校验上架状态后生成展示链接，不能直接公开后台签名接口。
+旧记录如果仍然是对象Key，不会因为发布代码就自动成为URL。处理方式：
 
-## 5. 前端调用示例
+1. 少量数据：重新上传图片，通过业务编辑接口保存返回的URL。
+2. 批量迁移：确认每个历史Key对应的Bucket和可访问域名后，为安全的相对Key补上实际域名；已是完整URL的值不要重复拼接。需要同时检查分类、品牌、SPU、SKU、用户头像和订单明细快照。
+3. 有中文、空格或特殊字符的Key，应做URL路径编码，不能盲目用SQL CONCAT。迁移后抽样验证匿名访问成功。
 
-```javascript
-const form = new FormData();
-form.append('file', fileInput.files[0]);
-const response = await fetch('/users/me/files/avatar', {
-  method: 'POST',
-  headers: { Authorization: token },
-  body: form
-});
-const result = await response.json();
-// 检查HTTP状态及result.code后，使用data.url预览，data.objectKey保存资料。
-```
+直接保存完整URL意味着以后换域名时需要迁移已保存地址；旧订单快照中的URL也不会随配置自动更新。不能将私有签名URL作为长期图片地址保存。
 
-不要手动填写multipart的Content-Type，浏览器会自动生成boundary。此模式是后端调用OSS，不要求为文件上传配置OSS浏览器跨域规则；前后端不同源时仍需处理应用接口本身的CORS。
+## 6. 验收
 
-## 6. 验收与当前限制
+上一版简化上传通过编译打包和16项临时内存校验，使用模拟OSS和独立MVC环境，不代表真实云端上传或完整登录链路验收；未新增测试源码或测试依赖。其中独立公开域名分支现已删除，该分支的历史校验不再适用于当前版本。
 
-2026-09-04异常响应修复补充：不支持的上传Content-Type返回HTTP 415；文件超限、缺少file或损坏multipart保持HTTP 400。Tomcat的 `max-swallow-size` 配置为8MB，用于在拒绝上传后有限排空请求体，让6MB附近的超限请求仍能收到完整JSON错误；实际许可仍是单文件5MB、总请求6MB，不是放宽上传大小，也不保证任意超大请求都能收到JSON。
+本版需要确认：
 
-本次新增真实Tomcat HTTP回归后，全量209项测试通过，并使用完整后端及.NET客户端完成12项实际接口复测。详情见《MallX_后端真实环境验收报告_20260904》第7节；OSS真实上传尚未验证。
+1. 带权限上传JPEG/PNG，响应体为完整URL字符串。
+2. 保存商品或头像后查询，原OssKey字段原样返回URL，前端无需额外转换。
+3. 游客可读取公开图片，但不能调用上传接口；普通用户不能调用后台上传接口。
+4. 错误文件、空文件、缺少file、超限请求被拒绝。
+5. 在浏览器无登录状态打开返回URL；代码生成地址并不证明OSS权限和域名已经配置成功。
 
-首次上传功能开发时，执行 `mvn -pl mallx-application -am test -q`，全量193项测试通过，0失败、0错误、0跳过。该阶段测试覆盖JPEG/PNG真实解码、伪装和损坏图片、文件/像素上限、Key目录隔离、上传权限、缺失参数、统一异常响应、客户端延迟初始化，以及假凭证下SDK标准域名/CNAME的本地V4签名。
-
-代码测试不连接真实OSS，不证明账号权限、域名证书、Bucket地域及实际上传已经联调通过。配置完成后依次验证：
-
-1. 正常JPEG/PNG上传成功，OSS对象Key、Content-Type正确，返回链接能预览。
-2. Key保存到头像或商品字段后重新查询仍存在；签名过期后刷新链接可访问。
-3. 空文件、伪装图片、损坏图片、超过5MB或像素上限的图片被拒绝。
-4. 游客不能上传；普通用户不能上传商品图；用户不能刷新其他用户头像。
-5. 模拟错误凭证/域名时返回统一500，不返回SDK内部详情；上传超限和缺失参数返回400。
-
-这版没有分布式限流、存储配额、内容审核、病毒扫描或大规模并发测试。正式对公网开放前应补用户上传频率/配额限制，避免登录用户滥用存储和带宽。
+历史193/209项测试和真实环境异常复测见《MallX_后端真实环境验收报告_20260904》。此前测试源码已按要求删除，本次不会恢复。真实OSS上传和已有数据库迁移仍需单独验收。

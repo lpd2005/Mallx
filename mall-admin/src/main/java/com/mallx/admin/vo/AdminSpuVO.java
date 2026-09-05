@@ -15,7 +15,10 @@ public class AdminSpuVO {
     private Long brandId;
     private String productName;
     private String subtitle;
+
+    /** 图片完整访问URL；沿用OssKey字段名，不再保存对象Key。空值表示未设置图片。 */
     private String mainImageOssKey;
+
     private String description;
     private BigDecimal minPrice;
     private BigDecimal maxPrice;

@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS order_item (
     product_name VARCHAR(255) NOT NULL COMMENT '下单时的商品名称快照',
     sku_name VARCHAR(255) NOT NULL COMMENT '下单时的SKU名称快照',
     spec_json JSON NOT NULL COMMENT '下单时的SKU规格JSON快照',
-    image_oss_key VARCHAR(512) DEFAULT NULL COMMENT '下单时的商品图片OSS对象Key快照',
+    image_oss_key VARCHAR(1024) DEFAULT NULL COMMENT '图片完整访问URL（沿用OSS Key字段名）',
     unit_price DECIMAL(12,2) NOT NULL COMMENT '商品成交单价',
     quantity INT NOT NULL COMMENT '购买数量',
     subtotal DECIMAL(12,2) NOT NULL COMMENT '明细成交小计',

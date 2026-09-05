@@ -43,27 +43,19 @@ public class AliyunOssConfiguration {
                 properties.getEndpoint(), properties.getBucketName(), properties.getRegion())) {
             throw new IllegalStateException("OSS配置不完整，请配置mall.oss的endpoint、bucket-name和region");
         }
-        URI endpoint = requireHttpsUrl(properties.getEndpoint(), false);
-        if (properties.getSignedUrlSeconds() < 60 || properties.getSignedUrlSeconds() > 3600) {
-            throw new IllegalStateException("OSS签名链接有效期必须为60到3600秒");
-        }
-        if (StrUtil.isNotBlank(properties.getPublicBaseUrl())) {
-            requireHttpsUrl(properties.getPublicBaseUrl(), true);
-        } else if (endpoint.getHost().contains("-internal.")) {
-            throw new IllegalStateException("私有图片签名链接需使用公网或自定义域名，不能使用内网Endpoint");
-        }
+        requireHttpsEndpoint(properties.getEndpoint());
     }
 
-    private static URI requireHttpsUrl(String value, boolean allowPath) {
+    /** 校验上传及图片访问共用的Endpoint，不修改云端访问权限。 */
+    private static void requireHttpsEndpoint(String value) {
         URI uri = URI.create(value);
         if (!"https".equalsIgnoreCase(uri.getScheme())
                 || uri.getHost() == null
                 || uri.getUserInfo() != null
                 || uri.getQuery() != null
                 || uri.getFragment() != null
-                || (!allowPath && uri.getPath() != null && !uri.getPath().isEmpty())) {
+                || (uri.getPath() != null && !uri.getPath().isEmpty())) {
             throw new IllegalStateException("OSS地址必须为HTTPS且不能包含凭证、查询参数或片段；Endpoint不能带路径或末尾斜杠");
         }
-        return uri;
     }
 }

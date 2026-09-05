@@ -40,9 +40,6 @@ mallx:
       endpoint: ${mall.oss.endpoint:}
       bucket-name: ${mall.oss.bucket-name:}
       region: ${mall.oss.region:}
-      # 留空使用私有Bucket限时签名链接；填写需事先配置公开图片域名/CDN访问权限。
-      public-base-url: ${mall.oss.public-base-url:}
-      signed-url-seconds: ${mall.oss.signed-url-seconds:900}
       # 阿里云 OSS 的访问凭证不要填写在此文件中，请使用环境变量：
       # OSS_ACCESS_KEY_ID=
       # OSS_ACCESS_KEY_SECRET=

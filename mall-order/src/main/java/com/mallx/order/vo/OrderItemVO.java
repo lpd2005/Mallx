@@ -14,7 +14,10 @@ public class OrderItemVO {
     private String productName;
     private String skuName;
     private String specJson;
+
+    /** 图片完整访问URL；沿用OssKey字段名，不再保存对象Key。空值表示未设置图片。 */
     private String imageOssKey;
+
     private BigDecimal unitPrice;
     private Integer quantity;
     private BigDecimal subtotal;

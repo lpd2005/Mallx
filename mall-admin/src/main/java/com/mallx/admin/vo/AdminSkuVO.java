@@ -15,7 +15,10 @@ public class AdminSkuVO {
     private String skuCode;
     private String skuName;
     private String specJson;
+
+    /** 图片完整访问URL；沿用OssKey字段名，不再保存对象Key。空值表示未设置图片。 */
     private String imageOssKey;
+
     private BigDecimal salePrice;
     private BigDecimal marketPrice;
     private Integer status;

@@ -13,6 +13,9 @@ public class AdminCategoryVO {
     private String categoryName;
     private Integer categoryLevel;
     private Integer sort;
+
+    /** 图片完整访问URL；沿用OssKey字段名，不再保存对象Key。空值表示未设置图片。 */
     private String iconOssKey;
+
     private Integer enabled;
 }

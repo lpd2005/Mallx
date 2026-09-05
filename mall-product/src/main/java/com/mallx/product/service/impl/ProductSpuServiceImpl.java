@@ -63,7 +63,7 @@ public class ProductSpuServiceImpl extends ServiceImpl<ProductSpuMapper, Product
                         .orderByDesc(ProductSpu::getUpdatedAt, ProductSpu::getId)
                         .page(new Page<>(query.getCurrent(), query.getSize()));
         return new PageResult<>(
-                BeanUtil.copyToList(page.getRecords(), SpuVO.class),
+                page.getRecords().stream().map(this::toVO).toList(),
                 page.getTotal(),
                 page.getCurrent(),
                 page.getSize());

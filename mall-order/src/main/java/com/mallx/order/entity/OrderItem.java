@@ -31,6 +31,8 @@ public class OrderItem {
 
     private String skuName;
     private String specJson;
+
+    /** 图片完整访问URL；沿用OssKey字段名，不再保存对象Key。空值表示未设置图片。 */
     private String imageOssKey;
 
     /** 成交单价。 */

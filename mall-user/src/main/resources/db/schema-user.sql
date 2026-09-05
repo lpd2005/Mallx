@@ -4,7 +4,7 @@
 CREATE TABLE IF NOT EXISTS user_profile (
     user_id BIGINT NOT NULL COMMENT '用户ID，与 auth_account.id 一致',
     nickname VARCHAR(32) NOT NULL COMMENT '用户昵称',
-    avatar_oss_key VARCHAR(255) DEFAULT NULL COMMENT '头像 OSS 对象 Key',
+    avatar_oss_key VARCHAR(1024) DEFAULT NULL COMMENT '图片完整访问URL（沿用OSS Key字段名）',
     gender TINYINT NOT NULL DEFAULT 0 COMMENT '性别：0 未知，1 男，2 女',
     birthday DATE DEFAULT NULL COMMENT '生日',
     bio VARCHAR(255) DEFAULT NULL COMMENT '个人简介',

@@ -24,9 +24,4 @@ public class AliyunOssProperties {
     /** Bucket 所在地域，例如 cn-hangzhou。 */
     private String region;
 
-    /** 公开图片/CDN地址；留空使用私有Bucket限时签名链接，不改变Bucket ACL。 */
-    private String publicBaseUrl;
-
-    /** 签名链接有效秒数，限制60～3600秒。 */
-    private int signedUrlSeconds = 900;
 }

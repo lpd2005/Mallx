@@ -1,6 +1,7 @@
 package com.mallx.product.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.mallx.common.enums.ResultCode;
@@ -12,7 +13,9 @@ import com.mallx.product.mapper.ProductCategoryMapper;
 import com.mallx.product.mapper.ProductSpuMapper;
 import com.mallx.product.service.ProductCategoryService;
 import com.mallx.product.vo.CategoryVO;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,26 +35,28 @@ public class ProductCategoryServiceImpl extends ServiceImpl<ProductCategoryMappe
     private final ProductSpuMapper productSpuMapper;
 
     /** 查询并在内存中组装分类树。 */
-    //TODO 算法
+    // TODO 算法
     @Override
     public List<CategoryVO> categoryTree() {
-        List<ProductCategory> categories = lambdaQuery()
-                .eq(ProductCategory::getEnabled, ENABLED)
-                .orderByAsc(ProductCategory::getCategoryLevel)
-                .orderByAsc(ProductCategory::getSort)
-                .list();
+        List<ProductCategory> categories =
+                lambdaQuery()
+                        .eq(ProductCategory::getEnabled, ENABLED)
+                        .orderByAsc(ProductCategory::getCategoryLevel)
+                        .orderByAsc(ProductCategory::getSort)
+                        .list();
         Map<Long, CategoryVO> nodes = new LinkedHashMap<>();
         categories.forEach(category -> nodes.put(category.getId(), toVO(category)));
         List<CategoryVO> roots = new ArrayList<>();
-        categories.forEach(category -> {
-            CategoryVO node = nodes.get(category.getId());
-            CategoryVO parent = nodes.get(category.getParentId());
-            if (category.getParentId() == 0 || parent == null) {
-                roots.add(node);
-            } else {
-                parent.getChildren().add(node);
-            }
-        });
+        categories.forEach(
+                category -> {
+                    CategoryVO node = nodes.get(category.getId());
+                    CategoryVO parent = nodes.get(category.getParentId());
+                    if (category.getParentId() == 0 || parent == null) {
+                        roots.add(node);
+                    } else {
+                        parent.getChildren().add(node);
+                    }
+                });
         return roots;
     }
 
@@ -78,8 +83,8 @@ public class ProductCategoryServiceImpl extends ServiceImpl<ProductCategoryMappe
         if (categoryId.equals(request.getParentId())) {
             throw new BusinessException(ResultCode.BAD_REQUEST, "分类不能以自身作为父分类");
         }
-        if (!category.getParentId().equals(request.getParentId()) && lambdaQuery()
-                .eq(ProductCategory::getParentId, categoryId).count() > 0) {
+        if (!category.getParentId().equals(request.getParentId())
+                && lambdaQuery().eq(ProductCategory::getParentId, categoryId).count() > 0) {
             // 移动非叶子分类需要同步整棵子树层级，当前阶段禁止该操作，避免形成错误层级。
             throw new BusinessException(ResultCode.BAD_REQUEST, "存在子分类时不能更换父分类");
         }
@@ -101,8 +106,10 @@ public class ProductCategoryServiceImpl extends ServiceImpl<ProductCategoryMappe
         if (lambdaQuery().eq(ProductCategory::getParentId, categoryId).count() > 0) {
             throw new BusinessException(ResultCode.BAD_REQUEST, "存在子分类，不能删除当前分类");
         }
-        Long spuCount = productSpuMapper.selectCount(Wrappers.<ProductSpu>lambdaQuery()
-                .eq(ProductSpu::getCategoryId, categoryId));
+        Long spuCount =
+                productSpuMapper.selectCount(
+                        Wrappers.<ProductSpu>lambdaQuery()
+                                .eq(ProductSpu::getCategoryId, categoryId));
         if (spuCount > 0) {
             throw new BusinessException(ResultCode.BAD_REQUEST, "分类已关联商品，不能删除");
         }
@@ -142,11 +149,12 @@ public class ProductCategoryServiceImpl extends ServiceImpl<ProductCategoryMappe
     }
 
     private void ensureUnique(Long excludedId, Long parentId, String name) {
-        long count = lambdaQuery()
-                .eq(ProductCategory::getParentId, parentId)
-                .eq(ProductCategory::getCategoryName, name.trim())
-                .ne(excludedId != null, ProductCategory::getId, excludedId)
-                .count();
+        long count =
+                lambdaQuery()
+                        .eq(ProductCategory::getParentId, parentId)
+                        .eq(ProductCategory::getCategoryName, name.trim())
+                        .ne(excludedId != null, ProductCategory::getId, excludedId)
+                        .count();
         if (count > 0) {
             throw new BusinessException(ResultCode.BAD_REQUEST, "同级分类名称已存在");
         }
@@ -159,13 +167,14 @@ public class ProductCategoryServiceImpl extends ServiceImpl<ProductCategoryMappe
     }
 
     private CategoryVO toVO(ProductCategory category) {
-        return CategoryVO.builder().
-                id(category.getId()).
-                parentId(category.getParentId())
+        return CategoryVO.builder()
+                .id(category.getId())
+                .parentId(category.getParentId())
                 .categoryName(category.getCategoryName())
                 .categoryLevel(category.getCategoryLevel())
                 .sort(category.getSort())
                 .iconOssKey(category.getIconOssKey())
-                .children(new ArrayList<>()).build();
+                .children(new ArrayList<>())
+                .build();
     }
 }

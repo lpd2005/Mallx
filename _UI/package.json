@@ -1,0 +1,32 @@
+{
+  "name": "mallx-ui",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "shared",
+    "storefront",
+    "admin"
+  ],
+  "scripts": {
+    "dev:storefront": "npm run dev -w @mallx/storefront",
+    "dev:admin": "npm run dev -w @mallx/admin",
+    "build": "npm run build -w @mallx/storefront && npm run build -w @mallx/admin",
+    "test": "vitest run",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "engines": {
+    "node": ">=22.12"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "@vue/test-utils": "^2.4.6",
+    "eslint": "^9.39.0",
+    "eslint-plugin-vue": "^10.5.0",
+    "globals": "^16.5.0",
+    "jsdom": "^26.1.0",
+    "prettier": "^3.6.0",
+    "vitest": "^3.2.0"
+  }
+}

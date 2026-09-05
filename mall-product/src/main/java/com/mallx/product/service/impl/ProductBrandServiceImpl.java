@@ -1,6 +1,7 @@
 package com.mallx.product.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.mallx.common.enums.ResultCode;
@@ -12,7 +13,9 @@ import com.mallx.product.mapper.ProductBrandMapper;
 import com.mallx.product.mapper.ProductSpuMapper;
 import com.mallx.product.service.ProductBrandService;
 import com.mallx.product.vo.BrandVO;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,9 +32,13 @@ public class ProductBrandServiceImpl extends ServiceImpl<ProductBrandMapper, Pro
     /** 查询前台可见品牌。 */
     @Override
     public List<BrandVO> listEnabledBrands() {
-        return lambdaQuery().eq(ProductBrand::getEnabled, ENABLED)
+        return lambdaQuery()
+                .eq(ProductBrand::getEnabled, ENABLED)
                 .orderByAsc(ProductBrand::getSort)
-                .list().stream().map(this::toVO).toList();
+                .list()
+                .stream()
+                .map(this::toVO)
+                .toList();
     }
 
     /** 创建品牌并校验名称唯一性。 */
@@ -61,8 +68,9 @@ public class ProductBrandServiceImpl extends ServiceImpl<ProductBrandMapper, Pro
     @Transactional
     public void deleteBrand(Long brandId) {
         requireBrand(brandId);
-        Long spuCount = productSpuMapper.selectCount(Wrappers.<ProductSpu>lambdaQuery()
-                .eq(ProductSpu::getBrandId, brandId));
+        Long spuCount =
+                productSpuMapper.selectCount(
+                        Wrappers.<ProductSpu>lambdaQuery().eq(ProductSpu::getBrandId, brandId));
         if (spuCount > 0) {
             throw new BusinessException(ResultCode.BAD_REQUEST, "品牌已关联商品，不能删除");
         }
@@ -88,26 +96,28 @@ public class ProductBrandServiceImpl extends ServiceImpl<ProductBrandMapper, Pro
     }
 
     private void ensureUnique(Long excludedId, String name) {
-        long count = lambdaQuery()
-                .eq(ProductBrand::getBrandName, name.trim())
-                .ne(excludedId != null, ProductBrand::getId, excludedId)
-                .count();
+        long count =
+                lambdaQuery()
+                        .eq(ProductBrand::getBrandName, name.trim())
+                        .ne(excludedId != null, ProductBrand::getId, excludedId)
+                        .count();
         if (count > 0) throw new BusinessException(ResultCode.BAD_REQUEST, "品牌名称已存在");
     }
 
     private void copy(BrandRequest request, ProductBrand brand) {
-        if (request.getEnabled() == null || (request.getEnabled() != 0 && request.getEnabled() != 1))
+        if (request.getEnabled() == null
+                || (request.getEnabled() != 0 && request.getEnabled() != 1))
             throw new BusinessException(ResultCode.BAD_REQUEST, "启用状态不正确");
         BeanUtil.copyProperties(request, brand);
         brand.setBrandName(request.getBrandName().trim());
     }
 
     private BrandVO toVO(ProductBrand brand) {
-        return BrandVO.builder().
-                id(brand.getId())
+        return BrandVO.builder()
+                .id(brand.getId())
                 .brandName(brand.getBrandName())
-                .logoOssKey(brand.getLogoOssKey()).
-                description(brand.getDescription()).
-                build();
+                .logoOssKey(brand.getLogoOssKey())
+                .description(brand.getDescription())
+                .build();
     }
 }

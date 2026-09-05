@@ -14,11 +14,8 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.Iterator;
 import java.util.Locale;
-import java.util.UUID;
 
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
@@ -30,33 +27,10 @@ import javax.imageio.stream.MemoryCacheImageInputStream;
 public class ImageUploadService {
     public static final int MAX_IMAGE_BYTES = 5 * 1024 * 1024;
     private static final long MAX_PIXELS = 16_000_000L;
-    private static final DateTimeFormatter DIRECTORY = DateTimeFormatter.ofPattern("yyyy/MM");
-    private static final String KEY_SUFFIX = "[0-9]{4}/(0[1-9]|1[0-2])/[a-f0-9]{32}\\.(jpg|png)";
     private final AliyunOssUtil oss;
 
-    /** 商品、品牌、分类图片共用商品目录，操作人ID来自登录上下文。 */
-    public ImageUploadVO uploadProductImage(MultipartFile file, Long operatorId) {
-        return upload(file, "products/" + requireUserId(operatorId) + "/");
-    }
-
-    /** 头像按用户ID隔离，客户端不能指定其他人的目录。 */
-    public ImageUploadVO uploadAvatar(MultipartFile file, Long userId) {
-        return upload(file, "avatars/" + requireUserId(userId) + "/");
-    }
-
-    /** 调用此方法前必须经过后台商品管理权限校验。 */
-    public ImageUploadVO productImageUrl(String objectKey) {
-        requireKey(objectKey, "products/[1-9][0-9]*/" + KEY_SUFFIX);
-        return oss.accessUrl(objectKey);
-    }
-
-    /** 只允许刷新当前用户自己的头像链接，不为任意OSS对象签名。 */
-    public ImageUploadVO avatarUrl(String objectKey, Long userId) {
-        requireKey(objectKey, "avatars/" + requireUserId(userId) + "/" + KEY_SUFFIX);
-        return oss.accessUrl(objectKey);
-    }
-
-    private ImageUploadVO upload(MultipartFile file, String prefix) {
+    /** 校验真实图片内容后上传，直接返回公开访问URL；调用入口负责登录及权限校验。 */
+    public String upload(MultipartFile file) {
         if (file == null || file.isEmpty()) throw badRequest("请选择非空图片");
         if (file.getSize() > MAX_IMAGE_BYTES) throw badRequest("图片不能超过5MB");
         byte[] content;
@@ -94,14 +68,7 @@ public class ImageUploadService {
                     // 重新编码移除附加数据及原始元数据，不信任文件名和客户端Content-Type。
                     if (!ImageIO.write(image, format, output)) throw badRequest("图片格式不受支持");
                     String extension = format.equals("jpeg") ? "jpg" : "png";
-                    String key =
-                            prefix
-                                    + LocalDate.now().format(DIRECTORY)
-                                    + "/"
-                                    + UUID.randomUUID().toString().replace("-", "")
-                                    + "."
-                                    + extension;
-                    return oss.upload(output.toByteArray(), key, "image/" + format);
+                    return oss.upload(output.toByteArray(), "image." + extension);
                 } finally {
                     image.flush();
                 }
@@ -110,17 +77,6 @@ public class ImageUploadService {
             }
         } catch (IOException exception) {
             throw badRequest("图片损坏或编码后超过5MB，请压缩后重试");
-        }
-    }
-
-    private Long requireUserId(Long userId) {
-        if (userId == null || userId <= 0) throw badRequest("用户ID无效");
-        return userId;
-    }
-
-    private void requireKey(String objectKey, String pattern) {
-        if (objectKey == null || objectKey.length() > 255 || !objectKey.matches(pattern)) {
-            throw badRequest("图片Key不属于允许访问的目录或格式不正确");
         }
     }
 
