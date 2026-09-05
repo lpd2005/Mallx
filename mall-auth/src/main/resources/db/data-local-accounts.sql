@@ -1,7 +1,7 @@
 -- MallX 本地开发账号初始化脚本（MySQL 8）。
--- 用途：删除2026-09-04验收创建的四个测试账号，然后初始化三个固定本地账号。
+-- 用途：删除2026-09-04验收创建的四个测试账号，然后初始化四个固定本地账号。
 -- 执行前请备份mall数据库；请勿在生产环境使用固定弱密码。
--- 当前系统使用手机号登录，所以admin、user1、user2是昵称，登录账号是下面的手机号。
+-- 当前系统使用手机号登录，所以admin、operator、user1、user2是昵称，登录账号是下面的手机号。
 -- 执行前必须先执行mall-admin/src/main/resources/db/data-admin-rbac.sql，保证SYSTEM_ADMIN及其权限已初始化。
 
 START TRANSACTION;
@@ -82,16 +82,24 @@ WHERE NOT EXISTS (
     SELECT 1 FROM auth_account WHERE id = 10003 OR phone = '18800000002'
 );
 
+INSERT INTO auth_account (id, phone, password_hash, status)
+SELECT 10004, '18800000003', '$2a$10$AthLfsQA8S8Ghc3wEX4rVeWslClhcDErb5jmYQSn6fUfQSWNRIbei', 1
+WHERE NOT EXISTS (
+    SELECT 1 FROM auth_account WHERE id = 10004 OR phone = '18800000003'
+);
+
 -- 重复执行时，只有ID和手机号均匹配才重置密码及状态；不会覆盖发生冲突的其他账号。
 UPDATE auth_account
 SET password_hash = '$2a$10$AthLfsQA8S8Ghc3wEX4rVeWslClhcDErb5jmYQSn6fUfQSWNRIbei', status = 1
 WHERE (id = 10001 AND phone = '18800000000')
    OR (id = 10002 AND phone = '18800000001')
-   OR (id = 10003 AND phone = '18800000002');
+   OR (id = 10003 AND phone = '18800000002')
+   OR (id = 10004 AND phone = '18800000003');
 
 SET @admin_id = (SELECT id FROM auth_account WHERE id = 10001 AND phone = '18800000000');
 SET @user1_id = (SELECT id FROM auth_account WHERE id = 10002 AND phone = '18800000001');
 SET @user2_id = (SELECT id FROM auth_account WHERE id = 10003 AND phone = '18800000002');
+SET @operator_id = (SELECT id FROM auth_account WHERE id = 10004 AND phone = '18800000003');
 
 INSERT INTO user_profile (user_id, nickname, gender)
 SELECT @admin_id, 'admin', 0
@@ -108,9 +116,14 @@ SELECT @user2_id, 'user2', 0
 WHERE @user2_id IS NOT NULL
 ON DUPLICATE KEY UPDATE nickname = 'user2';
 
--- 三个固定账号先清空角色；普通用户保持无角色，admin只关联SYSTEM_ADMIN。
+INSERT INTO user_profile (user_id, nickname, gender)
+SELECT @operator_id, 'operator', 0
+WHERE @operator_id IS NOT NULL
+ON DUPLICATE KEY UPDATE nickname = 'operator';
+
+-- 四个固定账号先清空角色；普通用户保持无角色，admin和operator分别关联对应后台角色。
 DELETE FROM auth_account_role
-WHERE account_id IN (@admin_id, @user1_id, @user2_id);
+WHERE account_id IN (@admin_id, @user1_id, @user2_id, @operator_id);
 
 INSERT INTO auth_account_role (account_id, role_id)
 SELECT @admin_id, role.id
@@ -119,9 +132,16 @@ WHERE @admin_id IS NOT NULL
   AND role.role_code = 'SYSTEM_ADMIN'
   AND role.status = 1;
 
+INSERT INTO auth_account_role (account_id, role_id)
+SELECT @operator_id, role.id
+FROM auth_role role
+WHERE @operator_id IS NOT NULL
+  AND role.role_code = 'OPERATOR'
+  AND role.status = 1;
+
 COMMIT;
 
--- 执行结果检查：应返回三个账号；admin有SYSTEM_ADMIN，user1和user2角色为NULL。
+-- 执行结果检查：应返回四个账号；admin有SYSTEM_ADMIN，operator有OPERATOR，普通用户角色为NULL。
 SELECT account.id,
        account.phone,
        profile.nickname,
@@ -131,7 +151,7 @@ FROM auth_account account
 LEFT JOIN user_profile profile ON profile.user_id = account.id
 LEFT JOIN auth_account_role account_role ON account_role.account_id = account.id
 LEFT JOIN auth_role role ON role.id = account_role.role_id
-WHERE account.id IN (10001, 10002, 10003)
+WHERE account.id IN (10001, 10002, 10003, 10004)
 GROUP BY account.id, account.phone, profile.nickname, account.status
 ORDER BY account.id;
 

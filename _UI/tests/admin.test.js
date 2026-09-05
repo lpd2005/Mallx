@@ -2,7 +2,7 @@ import { afterEach, beforeEach, it, expect, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createRouter, createMemoryHistory } from 'vue-router'
-import ElementPlus from 'element-plus'
+import ElementPlus, { ElMessageBox } from 'element-plus'
 import Resource from '../admin/src/views/Resource.vue'
 import Dashboard from '../admin/src/views/Dashboard.vue'
 import Inventory from '../admin/src/views/Inventory.vue'
@@ -92,4 +92,35 @@ it('普通角色显示权限配置，保留角色只可查看', async () => {
   expect(wrapper.text()).toContain('权限配置')
   const editButtons = wrapper.findAll('button').filter((b) => b.text() === '编辑')
   expect(editButtons).toHaveLength(1)
+})
+it('管理员可填写原因并取消用户全部会员权益', async () => {
+  api.get.mockResolvedValue({
+    records: [{ id: '9007199254740993', phone: '13800138000', status: 1 }],
+    total: 1,
+  })
+  const confirm = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm')
+  await render(Resource, { resource: 'users' })
+  await wrapper
+    .findAll('button')
+    .find((button) => button.text() === '取消会员')
+    .trigger('click')
+  await flushPromises()
+
+  const textarea = document.querySelector('.membership-dialog textarea')
+  textarea.value = '  客服核实后取消  '
+  textarea.dispatchEvent(new Event('input', { bubbles: true }))
+  const submit = [...document.querySelectorAll('.membership-dialog button')].find(
+    (button) => button.textContent.trim() === '确认取消',
+  )
+  submit.click()
+  await flushPromises()
+
+  expect(confirm).toHaveBeenCalledWith(
+    expect.stringContaining('全部会员权益'),
+    '请确认',
+    expect.any(Object),
+  )
+  expect(api.post).toHaveBeenCalledWith('/admin/users/9007199254740993/membership/cancel', {
+    remark: '客服核实后取消',
+  })
 })

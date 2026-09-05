@@ -32,7 +32,10 @@ const rows = ref([]),
   permissionIds = ref([]),
   role = ref(),
   profile = ref(),
-  profileDialog = ref(false)
+  profileDialog = ref(false),
+  membershipDialog = ref(false),
+  membershipUser = ref(),
+  membershipRemark = ref('')
 const columns = computed(() => config.columns)
 async function load() {
   const params = {
@@ -127,6 +130,22 @@ function showProfile(row) {
     profileDialog.value = true
   })
 }
+function openMembershipCancel(row) {
+  membershipUser.value = row
+  membershipRemark.value = ''
+  membershipDialog.value = true
+}
+function cancelMembership() {
+  const remark = membershipRemark.value.trim()
+  if (remark.length > 255) return
+  run(async () => {
+    await confirmAction('确认取消该用户的全部会员权益？VIP及其普通会员回退权益会一并取消。')
+    await api.post(`/admin/users/${membershipUser.value.id}/membership/cancel`, {
+      remark: remark || null,
+    })
+    membershipDialog.value = false
+  }, '会员权益已取消')
+}
 function editPermissions(row) {
   run(async () => {
     role.value = row
@@ -213,7 +232,7 @@ onMounted(() => run(load))
         v-if="!config.readonly"
         label="操作"
         fixed="right"
-        :width="config.user ? 250 : config.shelf ? 220 : 190"
+        :width="config.user ? 330 : config.shelf ? 220 : 190"
       >
         <template #default="{ row }">
           <div class="table-actions">
@@ -275,6 +294,9 @@ onMounted(() => run(load))
                 @click="router.push({ path: '/assignments', query: { userId: row.id } })"
               >
                 分配角色
+              </el-button>
+              <el-button link type="danger" :disabled="busy" @click="openMembershipCancel(row)">
+                取消会员
               </el-button>
             </template>
             <el-button
@@ -356,5 +378,39 @@ onMounted(() => run(load))
       <el-descriptions-item label="简介">{{ profile.bio || '—' }}</el-descriptions-item>
     </el-descriptions>
     <el-empty v-else description="该账号尚无个人资料" />
+  </el-dialog>
+  <el-dialog
+    v-model="membershipDialog"
+    title="取消会员权益"
+    width="520px"
+    destroy-on-close
+    class="membership-dialog"
+  >
+    <el-alert
+      title="该操作会取消全部会员权益，包括VIP及其普通会员回退权益。目标已是非会员时，后端仍会按成功处理。"
+      type="warning"
+      :closable="false"
+      show-icon
+    />
+    <el-descriptions :column="1" border class="section-gap">
+      <el-descriptions-item label="用户ID">{{ membershipUser?.id }}</el-descriptions-item>
+      <el-descriptions-item label="手机号">{{ membershipUser?.phone || '—' }}</el-descriptions-item>
+    </el-descriptions>
+    <el-form label-position="top" class="section-gap">
+      <el-form-item label="取消原因（选填）">
+        <el-input
+          v-model="membershipRemark"
+          type="textarea"
+          :rows="3"
+          maxlength="255"
+          show-word-limit
+          placeholder="填写取消原因，内容将写入会员变更日志"
+        />
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <el-button @click="membershipDialog = false">返回</el-button>
+      <el-button type="danger" :loading="busy" @click="cancelMembership">确认取消</el-button>
+    </template>
   </el-dialog>
 </template>

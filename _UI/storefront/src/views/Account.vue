@@ -1,6 +1,6 @@
 <script setup>
 import { inject, ref, onMounted, reactive } from 'vue'
-import { useTask } from '@mallx/shared/useTask.js'
+import { useTask, confirmAction } from '@mallx/shared/useTask.js'
 import { dateTime } from '@mallx/shared/format.js'
 import ImageUpload from '@mallx/shared/components/ImageUpload.vue'
 const api = inject('api'),
@@ -8,7 +8,9 @@ const api = inject('api'),
   membership = ref(),
   formRef = ref(),
   ready = ref(false),
-  uploading = ref(false)
+  uploading = ref(false),
+  vipDialog = ref(false),
+  durationMonths = ref(12)
 const form = reactive({ nickname: '', avatarOssKey: '', gender: 0, birthday: null, bio: '' })
 async function load() {
   const [profile, member] = await Promise.all([
@@ -23,6 +25,26 @@ async function save() {
   if (uploading.value) return
   if (!(await formRef.value.validate().catch(() => false))) return
   run(() => api.put('/users/me', { ...form }), '个人资料已保存')
+}
+function activateNormal() {
+  run(async () => {
+    await confirmAction('确认免费开通永久普通会员？开通后商品享95折优惠。')
+    membership.value = await api.post('/users/me/membership/normal')
+  }, '普通会员已开通')
+}
+function activateVip() {
+  run(
+    async () => {
+      await confirmAction(
+        `确认模拟${membership.value?.levelCode === 2 ? '续费' : '开通'} ${durationMonths.value} 个月VIP？本次不会发生真实扣款。`,
+      )
+      membership.value = await api.post('/users/me/membership/vip', {
+        durationMonths: durationMonths.value,
+      })
+      vipDialog.value = false
+    },
+    membership.value?.levelCode === 2 ? 'VIP续费成功' : 'VIP开通成功',
+  )
 }
 onMounted(() => run(load))
 </script>
@@ -86,17 +108,83 @@ onMounted(() => run(load))
         </el-button>
       </el-form>
     </section>
-    <aside class="panel" style="align-self: start">
+    <aside class="panel membership-panel" style="align-self: start">
+      <div class="membership-badge">{{ membership?.levelCode === 2 ? 'VIP' : 'MX' }}</div>
       <p class="eyebrow">MEMBERSHIP</p>
       <h2>{{ membership?.levelName || '非会员' }}</h2>
-      <p>
+      <p class="membership-benefit">
         {{
           membership?.member
             ? `商品享 ${Number(membership.discountRate) * 10} 折优惠`
-            : '当前按商品原价结算'
+            : '开通会员，结算时自动享受专属折扣'
         }}
       </p>
-      <p v-if="membership?.expireAt" class="muted">到期时间 {{ dateTime(membership.expireAt) }}</p>
+      <p v-if="membership?.levelCode === 1" class="muted">永久有效</p>
+      <p v-if="membership?.expireAt" class="muted">
+        VIP有效期至 {{ dateTime(membership.expireAt) }}
+      </p>
+      <el-divider />
+      <div class="membership-actions">
+        <el-button
+          v-if="!membership?.member"
+          type="primary"
+          :loading="busy"
+          @click="activateNormal"
+        >
+          免费开通普通会员
+        </el-button>
+        <el-button
+          type="warning"
+          plain
+          :loading="busy"
+          @click="
+            () => {
+              durationMonths = 12
+              vipDialog = true
+            }
+          "
+        >
+          {{ membership?.levelCode === 2 ? '续费VIP' : '升级VIP' }}
+        </el-button>
+      </div>
+      <p v-if="membership?.levelCode === 2" class="membership-note">
+        VIP到期后，普通会员升级而来的账号将恢复普通会员权益。
+      </p>
     </aside>
   </div>
+  <el-dialog
+    v-model="vipDialog"
+    :title="membership?.levelCode === 2 ? '续费VIP' : '升级VIP'"
+    width="500px"
+    destroy-on-close
+  >
+    <el-alert
+      title="当前为MVP模拟开通，不会产生真实扣款。"
+      type="warning"
+      :closable="false"
+      class="error-banner"
+    />
+    <p class="muted">
+      {{
+        membership?.levelCode === 2
+          ? '所选月数将从当前VIP到期时间继续累加。'
+          : '开通后立即享受VIP折扣，到期时间由服务器计算。'
+      }}
+    </p>
+    <el-form label-position="top">
+      <el-form-item label="开通时长">
+        <el-radio-group v-model="durationMonths" class="membership-durations">
+          <el-radio-button v-for="months in [1, 3, 6, 12, 24, 36]" :key="months" :value="months">
+            {{ months }}个月
+          </el-radio-button>
+        </el-radio-group>
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <el-button @click="vipDialog = false">取消</el-button>
+      <el-button type="warning" :loading="busy" @click="activateVip">
+        确认模拟{{ membership?.levelCode === 2 ? '续费' : '开通' }}
+      </el-button>
+    </template>
+  </el-dialog>
 </template>

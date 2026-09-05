@@ -33,7 +33,8 @@ public class UserMembershipServiceImpl extends ServiceImpl<UserMembershipMapper,
     private static final int NONE_LEVEL_CODE = 0;
     private static final String NONE_LEVEL_NAME = "非会员";
     private static final int NONE_STATUS = 0;
-    private static final int MAX_EXPIRE_BATCH_SIZE = 1000;// 到期处理批次大小限制
+    private static final int MAX_VIP_DURATION_MONTHS = 36;
+    private static final int MAX_EXPIRE_BATCH_SIZE = 1000; // 到期处理批次大小限制
 
     /** 用于行锁和条件到期更新等无法由通用Service方法表达的SQL。 */
     private final UserMembershipMapper userMembershipMapper;
@@ -77,7 +78,7 @@ public class UserMembershipServiceImpl extends ServiceImpl<UserMembershipMapper,
         return memberVO(membership, level);
     }
 
-    /** 开通普通会员时清空到期时间，普通会员默认永久有效。 */
+    /** 开通普通会员时清空到期时间；已有有效VIP时直接返回，避免自助接口导致会员降级。 */
     @Override
     @Transactional
     public UserMembershipVO activateNormal(Long userId, Long operatorId, String remark) {
@@ -87,6 +88,19 @@ public class UserMembershipServiceImpl extends ServiceImpl<UserMembershipMapper,
 
         if (isActiveLevel(membership, MemberLevelCode.NORMAL)) {
             return memberVO(membership, level);
+        }
+        if (isActiveLevel(membership, MemberLevelCode.VIP)) {
+            LocalDateTime now = LocalDateTime.now();
+            if (membership.getExpireAt() != null && membership.getExpireAt().isAfter(now)) {
+                MemberLevel vipLevel = memberLevelService.requireLevel(MemberLevelCode.VIP, false);
+                return memberVO(membership, vipLevel);
+            }
+            if (membership.getExpireAt() != null && expireVip(membership, now)) {
+                membership = getById(userId);
+                if (isActiveLevel(membership, MemberLevelCode.NORMAL)) {
+                    return memberVO(membership, level);
+                }
+            }
         }
 
         MembershipChangeType changeType = membership == null
@@ -160,6 +174,33 @@ public class UserMembershipServiceImpl extends ServiceImpl<UserMembershipMapper,
         saveLog(userId, beforeLevelCode, MemberLevelCode.VIP.getValue(), changeType,
                 beforeExpireAt, expireAt, operatorId, remark);
         return memberVO(membership, level);
+    }
+
+    /**
+     * 按月数开通VIP；有效VIP从原到期时间续期，其他状态从当前时间开始计算。
+     *
+     * <p>先读取实际生效权益，可同步收敛已经到期但定时任务尚未处理的VIP。
+     */
+    @Override
+    @Transactional
+    public UserMembershipVO activateVipForMonths(
+            Long userId, int durationMonths, Long operatorId, String remark) {
+        requireUserId(userId);
+        if (durationMonths < 1 || durationMonths > MAX_VIP_DURATION_MONTHS) {
+            throw new BusinessException(ResultCode.BAD_REQUEST, "VIP开通月数必须在1到36个月之间");
+        }
+        UserMembershipVO currentMembership = getCurrentMembership(userId);
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime startFrom = MemberLevelCode.VIP.matches(currentMembership.getLevelCode())
+                        && currentMembership.getExpireAt() != null
+                        && currentMembership.getExpireAt().isAfter(now)
+                ? currentMembership.getExpireAt()
+                : now;
+        return activateVip(
+                userId,
+                startFrom.plusMonths(durationMonths),
+                operatorId,
+                remark);
     }
 
     /** 取消操作保持幂等，不存在有效会员时直接返回。 */

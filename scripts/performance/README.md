@@ -3,6 +3,7 @@
 ## 文件
 
 - `prepare-mallx-pressure-data.sql`：初始化或重置500个压测用户、1万个SPU、2万个SKU及库存和优惠券数据。
+- `cleanup-mallx-pressure-data.sql`：按固定压测ID和命名清理上述MySQL测试数据，不影响普通账号和商品。
 - `mallx-mvp.jmx`：使用`scenario`参数切换商品、购物车、优惠券和热点库存下单场景。
 
 ## 固定数据
@@ -163,3 +164,14 @@ HAVING count > 1;
 - 默认主机为`127.0.0.1`。如需远程压测机，可在JMX的`host`默认值中修改。
 
 不要并发执行coupon和order两个场景，也不要在没有重置数据时重复比较结果。压测机和服务端在同一台电脑时，结果只能作为本机基线，不能直接宣传为生产承载能力。
+
+## 清理压测数据
+
+完成压测后，可在项目根目录执行：
+
+```powershell
+mysql --user=root --password --database=mall `
+  --execute="source D:/MallX/Mallx/scripts/performance/cleanup-mallx-pressure-data.sql"
+```
+
+该SQL只清理MySQL中的固定压测数据。购物车存放在Redis中，键为`mall:cart:{30001}`至`mall:cart:{30500}`，不属于SQL清理范围；JMeter生成的JTL和HTML报告也会保留。

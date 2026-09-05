@@ -327,6 +327,77 @@ body {
 .account-form {
   max-width: 640px;
 }
+.membership-panel {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(145deg, #153f35, #1c6250);
+  border-color: #235e4f;
+  color: #fff;
+}
+.membership-panel::after {
+  content: '';
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  right: -70px;
+  bottom: -100px;
+}
+.membership-panel .eyebrow,
+.membership-panel .muted {
+  color: #a9d5c5;
+}
+.membership-panel .el-divider {
+  border-color: rgba(255, 255, 255, 0.14);
+}
+.membership-badge {
+  position: absolute;
+  right: 24px;
+  top: 22px;
+  min-width: 48px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+  color: #f2d490;
+  font-weight: 800;
+  line-height: 32px;
+  text-align: center;
+  letter-spacing: 1px;
+}
+.membership-benefit {
+  min-height: 52px;
+  color: #e7f4ef;
+}
+.membership-actions {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 10px;
+}
+.membership-actions .el-button + .el-button {
+  margin-left: 0;
+}
+.membership-note {
+  position: relative;
+  z-index: 1;
+  margin: 16px 0 0;
+  color: #a9d5c5;
+  font-size: 13px;
+}
+.membership-durations {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  width: 100%;
+}
+.membership-durations .el-radio-button__inner {
+  width: 100%;
+  border: 1px solid #dbe4df !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
 .breadcrumb {
   margin-bottom: 25px;
 }

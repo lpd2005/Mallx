@@ -1,14 +1,13 @@
 package com.mallx.common.oss;
 
 import lombok.Data;
+import lombok.ToString;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
 /**
- * 阿里云 OSS 的非敏感连接配置。
- *
- * <p>访问凭证由 {@code OSS_ACCESS_KEY_ID} 和 {@code OSS_ACCESS_KEY_SECRET} 环境变量提供，不写入配置文件。
+ * 阿里云 OSS 配置，由 {@code mallx.aliyun.oss} 前缀统一绑定。
  */
 @Data
 @Component
@@ -23,5 +22,13 @@ public class AliyunOssProperties {
 
     /** Bucket 所在地域，例如 cn-hangzhou。 */
     private String region;
+
+    /** 阿里云访问密钥ID，从YAML配置注入。 */
+    @ToString.Exclude
+    private String accessKeyId;
+
+    /** 阿里云访问密钥Secret，从YAML配置注入，禁止记录到日志。 */
+    @ToString.Exclude
+    private String accessKeySecret;
 
 }

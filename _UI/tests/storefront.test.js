@@ -203,4 +203,49 @@ describe('商城页面', () => {
     expect(sessionStorage.getItem('mallx-pay-ORDER-1')).toBeNull()
     expect(router.currentRoute.value.path).toBe('/orders/ORDER-1')
   })
+  it('非会员可通过个人中心免费开通普通会员', async () => {
+    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm')
+    api.get.mockImplementation(async (url) => {
+      if (url === '/users/me') return { nickname: '测试用户', gender: 0 }
+      if (url === '/users/me/membership')
+        return { member: false, levelCode: 0, levelName: '非会员', discountRate: 1 }
+      return []
+    })
+    api.post.mockResolvedValue({
+      member: true,
+      levelCode: 1,
+      levelName: '普通会员',
+      discountRate: 0.95,
+    })
+    const { wrapper } = await render(Account, '/account')
+    const button = wrapper.findAll('button').find((item) => item.text() === '免费开通普通会员')
+    await button.trigger('click')
+    await flushPromises()
+    expect(api.post).toHaveBeenCalledWith('/users/me/membership/normal')
+    expect(wrapper.text()).toContain('普通会员')
+    expect(wrapper.text()).toContain('永久有效')
+  })
+  it('VIP开通提交1到36个月内的所选时长', async () => {
+    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm')
+    api.post.mockResolvedValue({
+      member: true,
+      levelCode: 2,
+      levelName: 'VIP会员',
+      discountRate: 0.8,
+      expireAt: '2027-09-05T12:00:00',
+    })
+    const { wrapper } = await render(Account, '/account')
+    const upgrade = wrapper.findAll('button').find((item) => item.text() === '升级VIP')
+    await upgrade.trigger('click')
+    await flushPromises()
+    const months = wrapper.findComponent({ name: 'ElRadioGroup' })
+    months.vm.$emit('update:modelValue', 6)
+    await flushPromises()
+    const submit = wrapper.findAll('button').find((item) => item.text() === '确认模拟开通')
+    await submit.trigger('click')
+    await flushPromises()
+    expect(api.post).toHaveBeenCalledWith('/users/me/membership/vip', { durationMonths: 6 })
+    expect(wrapper.text()).toContain('VIP会员')
+    expect(wrapper.text()).toContain('VIP有效期至')
+  })
 })
