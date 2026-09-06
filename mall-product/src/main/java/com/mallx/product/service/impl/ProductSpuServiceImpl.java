@@ -3,12 +3,19 @@ package com.mallx.product.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
 
+import com.alicp.jetcache.anno.CachePenetrationProtect;
+import com.alicp.jetcache.anno.CacheRefresh;
+import com.alicp.jetcache.anno.CacheInvalidate;
+import com.alicp.jetcache.anno.CacheType;
+import com.alicp.jetcache.anno.Cached;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.mallx.common.enums.ResultCode;
 import com.mallx.common.exception.BusinessException;
 import com.mallx.common.result.PageResult;
+import com.mallx.product.cache.ProductCacheInvalidator;
+import com.mallx.product.cache.ProductCacheDefinition;
 import com.mallx.product.dto.ProductPageQuery;
 import com.mallx.product.dto.SpuRequest;
 import com.mallx.product.entity.ProductSku;
@@ -23,8 +30,12 @@ import com.mallx.product.vo.SpuVO;
 
 import lombok.RequiredArgsConstructor;
 
+import org.redisson.api.RBloomFilter;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /** SPU业务实现。 */
 @Service
@@ -34,36 +45,39 @@ public class ProductSpuServiceImpl extends ServiceImpl<ProductSpuMapper, Product
     private final ProductCategoryService categoryService;
     private final ProductBrandService brandService;
     private final ProductSkuMapper productSkuMapper;
+    private final ProductCacheInvalidator cacheInvalidator;
+    private final RBloomFilter<Long> existingSpuIdBloomFilter;
 
     /** 简单单表条件用Lambda分页，不缓存价格，也不引入搜索引擎。 */
     @Override
+    @Cached(name = ProductCacheDefinition.Name.HOME_PAGE, key = ProductCacheDefinition.Key.DEFAULT_HOME_PAGE,
+            condition = ProductCacheDefinition.Condition.DEFAULT_HOME_PAGE,
+            expire = 120, localExpire = 10, cacheType = CacheType.BOTH, syncLocal = true)
+    @CacheRefresh(refresh = 60, stopRefreshAfterLastAccess = 120, refreshLockTimeout = 10)
+    @CachePenetrationProtect(timeout = 5)
     public PageResult<SpuVO> pageProducts(ProductPageQuery query) {
         // 服务层同样限制分页，防止内部调用绕过MVC校验触发无界查询。
-        if (query.getCurrent() < 1
-                || query.getCurrent() > 100000
-                || query.getSize() < 1
-                || query.getSize() > 100) {
+        if (query.getCurrent() < 1 || query.getCurrent() > 100000 || query.getSize() < 1 || query.getSize() > 100) {
             throw new BusinessException(ResultCode.BAD_REQUEST, "分页参数超出允许范围");
         }
+        return queryProducts(query);
+    }
+
+    private PageResult<SpuVO> queryProducts(ProductPageQuery query) {
         String keyword = StrUtil.trimToNull(query.getKeyword());
         // LIKE中的通配符按普通字符处理，参数仍由MyBatis绑定，不能拼接SQL。
-        String escapedKeyword =
-                keyword == null
-                        ? null
-                        : keyword.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+        String escapedKeyword = keyword == null ? null
+                : keyword.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
         Page<ProductSpu> page =
                 lambdaQuery()
                         .eq(ProductSpu::getStatus, ProductStatus.ON_SHELF.getValue())
-                        .eq(
-                                query.getCategoryId() != null,
-                                ProductSpu::getCategoryId,
-                                query.getCategoryId())
+                        .eq(query.getCategoryId() != null, ProductSpu::getCategoryId, query.getCategoryId())
                         .eq(query.getBrandId() != null, ProductSpu::getBrandId, query.getBrandId())
                         .like(escapedKeyword != null, ProductSpu::getProductName, escapedKeyword)
                         .orderByDesc(ProductSpu::getUpdatedAt, ProductSpu::getId)
                         .page(new Page<>(query.getCurrent(), query.getSize()));
         return new PageResult<>(
-                page.getRecords().stream().map(this::toVO).toList(),
+                new ArrayList<>(page.getRecords().stream().map(this::toVO).toList()),
                 page.getTotal(),
                 page.getCurrent(),
                 page.getSize());
@@ -78,12 +92,15 @@ public class ProductSpuServiceImpl extends ServiceImpl<ProductSpuMapper, Product
         copy(request, spu);
         spu.setStatus(ProductStatus.DRAFT.getValue());
         save(spu);
+        existingSpuIdBloomFilter.add(spu.getId());
         return spu;
     }
 
     /** 更新SPU共享信息。 */
     @Override
     @Transactional
+    @CacheInvalidate(name = ProductCacheDefinition.Name.SPU_BY_ID, key = ProductCacheDefinition.Key.SPU_ID)
+    @CacheInvalidate(name = ProductCacheDefinition.Name.HOME_PAGE, key = ProductCacheDefinition.Key.DEFAULT_HOME_PAGE)
     public ProductSpu updateSpu(Long spuId, SpuRequest request) {
         ProductSpu spu = requireSpu(spuId);
         validateRelations(request);
@@ -95,6 +112,9 @@ public class ProductSpuServiceImpl extends ServiceImpl<ProductSpuMapper, Product
     /** 仅允许物理删除没有SKU的草稿SPU。 */
     @Override
     @Transactional
+    @CacheInvalidate(name = ProductCacheDefinition.Name.SPU_BY_ID, key = ProductCacheDefinition.Key.SPU_ID)
+    @CacheInvalidate(name = ProductCacheDefinition.Name.SKUS_BY_SPU_ID, key = ProductCacheDefinition.Key.SPU_ID)
+    @CacheInvalidate(name = ProductCacheDefinition.Name.HOME_PAGE, key = ProductCacheDefinition.Key.DEFAULT_HOME_PAGE)
     public void deleteSpu(Long spuId) {
         ProductSpu spu = requireSpu(spuId);
         if (!ProductStatus.DRAFT.matches(spu.getStatus())) {
@@ -114,6 +134,9 @@ public class ProductSpuServiceImpl extends ServiceImpl<ProductSpuMapper, Product
     /** 修改SPU状态；没有已上架SKU时不能上架。 */
     @Override
     @Transactional
+    @CacheInvalidate(name = ProductCacheDefinition.Name.SPU_BY_ID, key = ProductCacheDefinition.Key.SPU_ID)
+    @CacheInvalidate(name = ProductCacheDefinition.Name.SKUS_BY_SPU_ID, key = ProductCacheDefinition.Key.SPU_ID)
+    @CacheInvalidate(name = ProductCacheDefinition.Name.HOME_PAGE, key = ProductCacheDefinition.Key.DEFAULT_HOME_PAGE)
     public void changeStatus(Long spuId, Integer status) {
         if (!ProductStatus.isValid(status)) {
             throw new BusinessException(ResultCode.BAD_REQUEST, "商品状态不正确");
@@ -122,7 +145,17 @@ public class ProductSpuServiceImpl extends ServiceImpl<ProductSpuMapper, Product
         if (ProductStatus.ON_SHELF.getValue() == status && spu.getMinPrice() == null) {
             throw new BusinessException(ResultCode.BAD_REQUEST, "至少需要一个已上架SKU才能上架SPU");
         }
+        List<Long> childSkuIds =
+                productSkuMapper
+                        .selectList(
+                                Wrappers.<ProductSku>lambdaQuery()
+                                        .select(ProductSku::getId)
+                                        .eq(ProductSku::getSpuId, spuId))
+                        .stream()
+                        .map(ProductSku::getId)
+                        .toList();
         lambdaUpdate().eq(ProductSpu::getId, spuId).set(ProductSpu::getStatus, status).update();
+        cacheInvalidator.invalidateSkuByIds(childSkuIds);
     }
 
     /** 查询必须存在的有效SPU记录。 */
@@ -135,9 +168,15 @@ public class ProductSpuServiceImpl extends ServiceImpl<ProductSpuMapper, Product
 
     /** 查询前台可见SPU。 */
     @Override
+    @Cached(name = ProductCacheDefinition.Name.SPU_BY_ID, key = ProductCacheDefinition.Key.SPU_ID,
+            expire = 600, localExpire = 30, cacheType = CacheType.BOTH, syncLocal = true)
+    @CachePenetrationProtect(timeout = 5)
     public SpuVO getSpu(Long spuId) {
-        ProductSpu spu = requireSpu(spuId);
-        if (!ProductStatus.ON_SHELF.matches(spu.getStatus())) {
+        if (spuId == null || !existingSpuIdBloomFilter.contains(spuId)) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "商品不存在或未上架");
+        }
+        ProductSpu spu = getById(spuId);
+        if (spu == null || !ProductStatus.ON_SHELF.matches(spu.getStatus())) {
             throw new BusinessException(ResultCode.NOT_FOUND, "商品不存在或未上架");
         }
         return toVO(spu);

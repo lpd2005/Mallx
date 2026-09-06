@@ -1167,7 +1167,9 @@ Redis
 
 ```text
 mall-product
- └── ProductCacheService
+ ├── ProductCacheInvalidator
+ ├── ProductBloomFilterConfiguration
+ └── ProductBloomFilterInitializer
 ```
 
 负责：
@@ -1383,4 +1385,3 @@ mall-gateway
 # 26. 面试时可以这样介绍
 
 > MallX 采用模块化单体架构，按照用户、商品、库存、订单、支付、营销、秒杀、搜索、售后等业务域进行模块划分。公共基础能力统一沉淀到 mall-common，使用 Caffeine + Redis 构建多级缓存，RabbitMQ 负责异步解耦与削峰。当前通过模块间 Service 调用保持低复杂度，同时保留清晰的领域边界，后续可以将秒杀、库存、订单、搜索等模块独立拆分为微服务。AI 部分通过 Java AI 接入层连接独立的 Python Agent 服务，实现 RAG、Tool Calling 和业务 Agent。
-

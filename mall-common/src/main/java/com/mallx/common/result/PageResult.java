@@ -4,6 +4,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.io.Serial;
+import java.io.Serializable;
 import java.util.List;
 
 /**
@@ -14,7 +16,10 @@ import java.util.List;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class PageResult<T> {
+public class PageResult<T> implements Serializable {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
 
     /** 当前页记录。 */
     private List<T> records;

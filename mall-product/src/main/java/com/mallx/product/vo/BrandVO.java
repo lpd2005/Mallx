@@ -3,10 +3,15 @@ package com.mallx.product.vo;
 import lombok.Builder;
 import lombok.Data;
 
+import java.io.Serial;
+import java.io.Serializable;
+
 /** 前台品牌信息。 */
 @Data
 @Builder
-public class BrandVO {
+public class BrandVO implements Serializable {
+    @Serial
+    private static final long serialVersionUID = 1L;
     /** 品牌ID。 */
     private Long id;
 

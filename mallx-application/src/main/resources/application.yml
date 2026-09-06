@@ -34,7 +34,38 @@ spring:
     username: ${mall.mq.username:guest}
     password: ${mall.mq.pw:guest}
 
+jetcache:
+  statIntervalMinutes: 1
+  areaInCacheName: false
+  useDefaultLocalExpireInMultiLevelCache: true
+  local:
+    default:
+      type: caffeine
+      keyConvertor: fastjson2
+      limit: 10000
+      expireAfterWriteInMillis: 30000
+      expireAfterAccessInMillis: 60000
+  remote:
+    default:
+      type: redis.springdata
+      keyConvertor: fastjson2
+      valueEncoder: java
+      valueDecoder: java
+      broadcastChannel: ${spring.application.name}:${SPRING_PROFILES_ACTIVE:local}:cache-invalidation
+      expireAfterWriteInMillis: 600000
+
 mallx:
+  cache:
+    bloom:
+      expected-insertions: 1000000
+      false-probability: 0.001
+    redisson:
+      host: ${spring.data.redis.host}
+      port: ${spring.data.redis.port}
+      database: ${spring.data.redis.database}
+      password: ${spring.data.redis.password:}
+      connection-pool-size: 32
+      connection-minimum-idle-size: 4
   aliyun:
     oss:
       endpoint: ${mall.oss.endpoint:}

@@ -3,12 +3,16 @@ package com.mallx.product.vo;
 import lombok.Builder;
 import lombok.Data;
 
+import java.io.Serial;
+import java.io.Serializable;
 import java.math.BigDecimal;
 
 /** 前台SKU详情。 */
 @Data
 @Builder
-public class SkuVO {
+public class SkuVO implements Serializable {
+    @Serial
+    private static final long serialVersionUID = 1L;
     /** SKU ID。 */
     private Long id;
 

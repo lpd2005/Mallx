@@ -13,7 +13,6 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 @Configuration
 public class RedisConfiguration {
 
-    @Bean
     /**
      * 创建通用 Redis 模板。
      *
@@ -22,6 +21,7 @@ public class RedisConfiguration {
      * @param connectionFactory Spring Boot 自动配置的 Redis 连接工厂
      * @return 可由各业务模块注入的 Redis 模板
      */
+    @Bean
     public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory connectionFactory) {
         RedisTemplate<String, Object> template = new RedisTemplate<>();
         StringRedisSerializer keySerializer = new StringRedisSerializer();

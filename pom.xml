@@ -27,6 +27,8 @@
         <sa-token.version>1.45.0</sa-token.version>
         <aliyun-oss.version>3.18.5</aliyun-oss.version>
         <druid>1.2.24</druid>
+        <jetcache.version>2.7.9</jetcache.version>
+        <redisson.version>4.7.0</redisson.version>
     </properties>
 
     <dependencyManagement>
@@ -70,6 +72,16 @@
                 <groupId>com.alibaba</groupId>
                 <artifactId>druid-spring-boot-starter</artifactId>
                 <version>${druid}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.alicp.jetcache</groupId>
+                <artifactId>jetcache-starter-redis-springdata</artifactId>
+                <version>${jetcache.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.redisson</groupId>
+                <artifactId>redisson</artifactId>
+                <version>${redisson.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

@@ -2,10 +2,16 @@ package com.mallx.product.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 
+import com.alicp.jetcache.anno.CachePenetrationProtect;
+import com.alicp.jetcache.anno.CacheRefresh;
+import com.alicp.jetcache.anno.CacheInvalidate;
+import com.alicp.jetcache.anno.CacheType;
+import com.alicp.jetcache.anno.Cached;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.mallx.common.enums.ResultCode;
 import com.mallx.common.exception.BusinessException;
+import com.mallx.product.cache.ProductCacheDefinition;
 import com.mallx.product.dto.CategoryRequest;
 import com.mallx.product.entity.ProductCategory;
 import com.mallx.product.entity.ProductSpu;
@@ -35,8 +41,11 @@ public class ProductCategoryServiceImpl extends ServiceImpl<ProductCategoryMappe
     private final ProductSpuMapper productSpuMapper;
 
     /** 查询并在内存中组装分类树。 */
-    // TODO 算法
     @Override
+    @Cached(name = ProductCacheDefinition.Name.CATEGORY_TREE, key = ProductCacheDefinition.Key.ALL,
+            expire = 1800, localExpire = 60, cacheType = CacheType.BOTH, syncLocal = true)
+    @CacheRefresh(refresh = 600, stopRefreshAfterLastAccess = 1800, refreshLockTimeout = 10)
+    @CachePenetrationProtect(timeout = 5)
     public List<CategoryVO> categoryTree() {
         List<ProductCategory> categories =
                 lambdaQuery()
@@ -63,6 +72,7 @@ public class ProductCategoryServiceImpl extends ServiceImpl<ProductCategoryMappe
     /** 创建分类并根据父节点计算层级。 */
     @Override
     @Transactional
+    @CacheInvalidate(name = ProductCacheDefinition.Name.CATEGORY_TREE, key = ProductCacheDefinition.Key.ALL)
     public ProductCategory createCategory(CategoryRequest request) {
         int level = resolveLevel(request.getParentId());
         ensureUnique(null, request.getParentId(), request.getCategoryName());
@@ -78,6 +88,7 @@ public class ProductCategoryServiceImpl extends ServiceImpl<ProductCategoryMappe
     /** 更新分类，同时保护已有子树的层级结构。 */
     @Override
     @Transactional
+    @CacheInvalidate(name = ProductCacheDefinition.Name.CATEGORY_TREE, key = ProductCacheDefinition.Key.ALL)
     public ProductCategory updateCategory(Long categoryId, CategoryRequest request) {
         ProductCategory category = requireCategory(categoryId);
         if (categoryId.equals(request.getParentId())) {
@@ -101,6 +112,7 @@ public class ProductCategoryServiceImpl extends ServiceImpl<ProductCategoryMappe
     /** 物理删除分类，删除前检查树形结构和商品引用。 */
     @Override
     @Transactional
+    @CacheInvalidate(name = ProductCacheDefinition.Name.CATEGORY_TREE, key = ProductCacheDefinition.Key.ALL)
     public void deleteCategory(Long categoryId) {
         requireCategory(categoryId);
         if (lambdaQuery().eq(ProductCategory::getParentId, categoryId).count() > 0) {

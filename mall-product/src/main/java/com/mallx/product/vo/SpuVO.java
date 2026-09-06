@@ -3,12 +3,16 @@ package com.mallx.product.vo;
 import lombok.Builder;
 import lombok.Data;
 
+import java.io.Serial;
+import java.io.Serializable;
 import java.math.BigDecimal;
 
 /** 前台SPU详情。 */
 @Data
 @Builder
-public class SpuVO {
+public class SpuVO implements Serializable {
+    @Serial
+    private static final long serialVersionUID = 1L;
     /** SPU ID。 */
     private Long id;
 

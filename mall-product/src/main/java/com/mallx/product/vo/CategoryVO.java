@@ -3,12 +3,16 @@ package com.mallx.product.vo;
 import lombok.Builder;
 import lombok.Data;
 
+import java.io.Serial;
+import java.io.Serializable;
 import java.util.List;
 
 /** 前台分类树节点。 */
 @Data
 @Builder
-public class CategoryVO {
+public class CategoryVO implements Serializable {
+    @Serial
+    private static final long serialVersionUID = 1L;
     /** 分类ID。 */
     private Long id;
 

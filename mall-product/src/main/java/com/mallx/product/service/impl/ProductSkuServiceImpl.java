@@ -3,9 +3,15 @@ package com.mallx.product.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.json.JSONUtil;
 
+import com.alicp.jetcache.anno.CachePenetrationProtect;
+import com.alicp.jetcache.anno.CacheInvalidate;
+import com.alicp.jetcache.anno.CacheType;
+import com.alicp.jetcache.anno.Cached;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.mallx.common.enums.ResultCode;
 import com.mallx.common.exception.BusinessException;
+import com.mallx.product.cache.ProductCacheInvalidator;
+import com.mallx.product.cache.ProductCacheDefinition;
 import com.mallx.product.dto.SkuRequest;
 import com.mallx.product.entity.ProductSku;
 import com.mallx.product.entity.ProductSpu;
@@ -17,11 +23,12 @@ import com.mallx.product.vo.CartProductVO;
 import com.mallx.product.vo.SkuVO;
 
 import lombok.RequiredArgsConstructor;
-
+import org.redisson.api.RBloomFilter;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
@@ -33,6 +40,8 @@ public class ProductSkuServiceImpl extends ServiceImpl<ProductSkuMapper, Product
         implements ProductSkuService {
     private final ProductSpuService spuService;
     private final ProductSkuMapper productSkuMapper;
+    private final ProductCacheInvalidator cacheInvalidator;
+    private final RBloomFilter<Long> existingSkuIdBloomFilter;
 
     /** 创建初始状态为草稿的SKU。 */
     @Override
@@ -44,12 +53,17 @@ public class ProductSkuServiceImpl extends ServiceImpl<ProductSkuMapper, Product
         copy(request, sku);
         sku.setStatus(ProductStatus.DRAFT.getValue());
         save(sku);
+        existingSkuIdBloomFilter.add(sku.getId());
         return sku;
     }
 
     /** 更新SKU；价格变化后同步刷新相关SPU价格区间。 */
     @Override
     @Transactional
+    @CacheInvalidate(name = ProductCacheDefinition.Name.SKU_BY_ID, key = ProductCacheDefinition.Key.SKU_ID)
+    @CacheInvalidate(name = ProductCacheDefinition.Name.SPU_BY_ID, key = ProductCacheDefinition.Key.REQUEST_SPU_ID)
+    @CacheInvalidate(name = ProductCacheDefinition.Name.SKUS_BY_SPU_ID, key = ProductCacheDefinition.Key.REQUEST_SPU_ID)
+    @CacheInvalidate(name = ProductCacheDefinition.Name.HOME_PAGE, key = ProductCacheDefinition.Key.DEFAULT_HOME_PAGE)
     public ProductSku updateSku(Long skuId, SkuRequest request) {
         ProductSku sku = requireSku(skuId);
         spuService.requireSpu(request.getSpuId());
@@ -59,12 +73,17 @@ public class ProductSkuServiceImpl extends ServiceImpl<ProductSkuMapper, Product
         updateById(sku);
         refreshPriceRange(oldSpuId);
         if (!oldSpuId.equals(request.getSpuId())) refreshPriceRange(request.getSpuId());
+        if (!oldSpuId.equals(request.getSpuId())) {
+            cacheInvalidator.invalidateSpuAndSkuListBySpuIds(List.of(oldSpuId));
+        }
         return sku;
     }
 
     /** 仅允许物理删除从未上架的草稿SKU。 */
     @Override
     @Transactional
+    @CacheInvalidate(name = ProductCacheDefinition.Name.SKU_BY_ID, key = ProductCacheDefinition.Key.SKU_ID)
+    @CacheInvalidate(name = ProductCacheDefinition.Name.HOME_PAGE, key = ProductCacheDefinition.Key.DEFAULT_HOME_PAGE)
     public void deleteSku(Long skuId) {
         ProductSku sku = requireSku(skuId);
         if (!ProductStatus.DRAFT.matches(sku.getStatus())) {
@@ -73,11 +92,14 @@ public class ProductSkuServiceImpl extends ServiceImpl<ProductSkuMapper, Product
         if (!removeById(skuId)) {
             throw new BusinessException(ResultCode.NOT_FOUND, "SKU不存在");
         }
+        cacheInvalidator.invalidateSpuAndSkuListBySpuIds(List.of(sku.getSpuId()));
     }
 
     /** 修改SKU状态并刷新SPU价格区间。 */
     @Override
     @Transactional
+    @CacheInvalidate(name = ProductCacheDefinition.Name.SKU_BY_ID, key = ProductCacheDefinition.Key.SKU_ID)
+    @CacheInvalidate(name = ProductCacheDefinition.Name.HOME_PAGE, key = ProductCacheDefinition.Key.DEFAULT_HOME_PAGE)
     public void changeStatus(Long skuId, Integer status) {
         if (!ProductStatus.isValid(status)) {
             throw new BusinessException(ResultCode.BAD_REQUEST, "SKU状态不正确");
@@ -85,6 +107,7 @@ public class ProductSkuServiceImpl extends ServiceImpl<ProductSkuMapper, Product
         ProductSku sku = requireSku(skuId);
         lambdaUpdate().eq(ProductSku::getId, skuId).set(ProductSku::getStatus, status).update();
         refreshPriceRange(sku.getSpuId());
+        cacheInvalidator.invalidateSpuAndSkuListBySpuIds(List.of(sku.getSpuId()));
     }
 
     /** 获取必须存在的SKU，库存初始化会调用此方法校验商品。 */
@@ -105,26 +128,39 @@ public class ProductSkuServiceImpl extends ServiceImpl<ProductSkuMapper, Product
 
     /** 查询指定已上架SPU的可售SKU。 */
     @Override
+    @Cached(name = ProductCacheDefinition.Name.SKUS_BY_SPU_ID, key = ProductCacheDefinition.Key.SPU_ID,
+            expire = 300, localExpire = 20, cacheType = CacheType.BOTH, syncLocal = true)
+    @CachePenetrationProtect(timeout = 5)
     public List<SkuVO> listBySpu(Long spuId) {
         spuService.getSpu(spuId);
-        return lambdaQuery()
-                .eq(ProductSku::getSpuId, spuId)
-                .eq(ProductSku::getStatus, ProductStatus.ON_SHELF.getValue())
-                .orderByAsc(ProductSku::getSalePrice)
-                .list()
-                .stream()
-                .map(this::toVO)
-                .toList();
+        return new ArrayList<>(
+                lambdaQuery()
+                        .eq(ProductSku::getSpuId, spuId)
+                        .eq(ProductSku::getStatus, ProductStatus.ON_SHELF.getValue())
+                        .orderByAsc(ProductSku::getSalePrice)
+                        .list()
+                        .stream()
+                        .map(this::toVO)
+                        .toList());
     }
 
     /** 查询前台可见SKU详情。 */
     @Override
+    @Cached(name = ProductCacheDefinition.Name.SKU_BY_ID, key = ProductCacheDefinition.Key.SKU_ID,
+            expire = 480, localExpire = 25, cacheType = CacheType.BOTH, syncLocal = true)
+    @CachePenetrationProtect(timeout = 5)
     public SkuVO getSku(Long skuId) {
-        ProductSku sku = requireSku(skuId);
-        if (!ProductStatus.ON_SHELF.matches(sku.getStatus()))
+        if (skuId == null || !existingSkuIdBloomFilter.contains(skuId)) {
             throw new BusinessException(ResultCode.NOT_FOUND, "SKU不存在或未上架");
-        // 单独查询SKU也必须检查所属SPU，避免游客绕过SPU详情看到草稿或已下架商品。
-        spuService.getSpu(sku.getSpuId());
+        }
+        ProductSku sku = getById(skuId);
+        if (sku == null || !ProductStatus.ON_SHELF.matches(sku.getStatus())) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "SKU不存在或未上架");
+        }
+        ProductSpu parent = spuService.getById(sku.getSpuId());
+        if (parent == null || !ProductStatus.ON_SHELF.matches(parent.getStatus())) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "SKU不存在或未上架");
+        }
         return toVO(sku);
     }
 

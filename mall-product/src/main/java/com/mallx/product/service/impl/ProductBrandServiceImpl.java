@@ -2,10 +2,16 @@ package com.mallx.product.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 
+import com.alicp.jetcache.anno.CachePenetrationProtect;
+import com.alicp.jetcache.anno.CacheRefresh;
+import com.alicp.jetcache.anno.CacheInvalidate;
+import com.alicp.jetcache.anno.CacheType;
+import com.alicp.jetcache.anno.Cached;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.mallx.common.enums.ResultCode;
 import com.mallx.common.exception.BusinessException;
+import com.mallx.product.cache.ProductCacheDefinition;
 import com.mallx.product.dto.BrandRequest;
 import com.mallx.product.entity.ProductBrand;
 import com.mallx.product.entity.ProductSpu;
@@ -19,6 +25,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /** 商品品牌业务实现。 */
@@ -31,19 +38,26 @@ public class ProductBrandServiceImpl extends ServiceImpl<ProductBrandMapper, Pro
 
     /** 查询前台可见品牌。 */
     @Override
+    @Cached(name = ProductCacheDefinition.Name.ENABLED_BRANDS, key = ProductCacheDefinition.Key.ALL,
+            expire = 1800, localExpire = 60,
+            cacheType = CacheType.BOTH, syncLocal = true)
+    @CacheRefresh(refresh = 600, stopRefreshAfterLastAccess = 1800, refreshLockTimeout = 10)
+    @CachePenetrationProtect(timeout = 5)
     public List<BrandVO> listEnabledBrands() {
-        return lambdaQuery()
-                .eq(ProductBrand::getEnabled, ENABLED)
-                .orderByAsc(ProductBrand::getSort)
-                .list()
-                .stream()
-                .map(this::toVO)
-                .toList();
+        return new ArrayList<>(
+                lambdaQuery()
+                        .eq(ProductBrand::getEnabled, ENABLED)
+                        .orderByAsc(ProductBrand::getSort)
+                        .list()
+                        .stream()
+                        .map(this::toVO)
+                        .toList());
     }
 
     /** 创建品牌并校验名称唯一性。 */
     @Override
     @Transactional
+    @CacheInvalidate(name = ProductCacheDefinition.Name.ENABLED_BRANDS, key = ProductCacheDefinition.Key.ALL)
     public ProductBrand createBrand(BrandRequest request) {
         ensureUnique(null, request.getBrandName());
         ProductBrand brand = new ProductBrand();
@@ -55,6 +69,7 @@ public class ProductBrandServiceImpl extends ServiceImpl<ProductBrandMapper, Pro
     /** 更新品牌并排除自身检查重名。 */
     @Override
     @Transactional
+    @CacheInvalidate(name = ProductCacheDefinition.Name.ENABLED_BRANDS, key = ProductCacheDefinition.Key.ALL)
     public ProductBrand updateBrand(Long brandId, BrandRequest request) {
         ProductBrand brand = requireBrand(brandId);
         ensureUnique(brandId, request.getBrandName());
@@ -66,6 +81,7 @@ public class ProductBrandServiceImpl extends ServiceImpl<ProductBrandMapper, Pro
     /** 物理删除没有关联商品的品牌。 */
     @Override
     @Transactional
+    @CacheInvalidate(name = ProductCacheDefinition.Name.ENABLED_BRANDS, key = ProductCacheDefinition.Key.ALL)
     public void deleteBrand(Long brandId) {
         requireBrand(brandId);
         Long spuCount =
