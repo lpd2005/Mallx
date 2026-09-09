@@ -11,7 +11,7 @@ public class InventoryStockVO {
     private Long skuId;
     /** 可用库存。 */
     private Integer availableStock;
-    /** 锁定库存。 */
+    /** 订单占用与秒杀活动预留的锁定库存。 */
     private Integer lockedStock;
     /** 已售库存。 */
     private Integer soldStock;

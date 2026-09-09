@@ -3,7 +3,7 @@
 CREATE TABLE IF NOT EXISTS inventory_stock (
     sku_id BIGINT NOT NULL COMMENT 'SKU ID',
     available_stock INT NOT NULL DEFAULT 0 COMMENT '可用库存',
-    locked_stock INT NOT NULL DEFAULT 0 COMMENT '已锁定、尚未最终扣减的库存',
+    locked_stock INT NOT NULL DEFAULT 0 COMMENT '订单占用或秒杀活动预留、尚未最终扣减的库存',
     sold_stock INT NOT NULL DEFAULT 0 COMMENT '已完成扣减的累计库存',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

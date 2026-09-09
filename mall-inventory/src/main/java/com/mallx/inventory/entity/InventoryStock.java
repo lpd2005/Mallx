@@ -16,7 +16,7 @@ public class InventoryStock {
     private Long skuId;
     /** 可以继续下单的库存数量。 */
     private Integer availableStock;
-    /** 已被订单占用但尚未最终扣减的数量。 */
+    /** 已被订单占用或被秒杀活动预留、但尚未最终扣减的数量。 */
     private Integer lockedStock;
     /** 已完成最终扣减的累计数量。 */
     private Integer soldStock;

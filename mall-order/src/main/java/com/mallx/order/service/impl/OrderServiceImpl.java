@@ -15,6 +15,9 @@ import com.mallx.order.enums.*;
 import com.mallx.order.mapper.MallOrderMapper;
 import com.mallx.order.service.*;
 import com.mallx.order.vo.*;
+import com.mallx.product.enums.ProductStatus;
+import com.mallx.product.service.ProductSkuService;
+import com.mallx.product.vo.CartProductVO;
 import com.mallx.user.service.*;
 import com.mallx.user.vo.*;
 
@@ -46,6 +49,7 @@ public class OrderServiceImpl extends ServiceImpl<MallOrderMapper, MallOrder>
     private final UserMembershipService membershipService;
     private final InventoryStockService inventoryService;
     private final CouponUserService couponService;
+    private final ProductSkuService productSkuService;
 
     /** 从购物车已勾选项重新取价并创建订单；Redis购物车只在事务提交后清理。 */
     @Override
@@ -86,6 +90,78 @@ public class OrderServiceImpl extends ServiceImpl<MallOrderMapper, MallOrder>
         saveLog(order, null, OrderStatus.WAIT_PAY, OrderOperationType.CREATE, userId, "创建订单"); // 记录订单创建操作流水
         afterCommitClearCart(userId, cartItems.stream().map(CartItemVO::getSkuId).toList()); // 注册事务提交后回调，成功提交才清理Redis购物车
         return toVO(order, items); // 组装订单视图返回
+    }
+
+    /**
+     * 秒杀价不再叠加会员折扣和优惠券；确定性订单号保证 MQ 重投幂等。
+     * 秒杀库存已在活动预热阶段转入 locked_stock，此处不能再次锁定库存。
+     */
+    @Override
+    @Transactional
+    public OrderVO createSeckillOrder(Long userId, Long skuId, int quantity, BigDecimal seckillPrice, Long addressId, String requestNo) {
+        requireUser(userId);
+        if (skuId == null || skuId <= 0 || quantity <= 0) throw bad("秒杀商品或数量不正确");
+        if (seckillPrice == null || seckillPrice.signum() <= 0) throw bad("秒杀价格不正确");
+        String normalizedRequestNo = requireNo(requestNo);
+        String orderNo = "SK" + normalizedRequestNo;
+        MallOrder existing = lambdaQuery().eq(MallOrder::getOrderNo, orderNo).one();
+        if (existing != null) {
+            if (!userId.equals(existing.getUserId())) throw forbidden();
+            return toVO(existing, items(existing.getId()));
+        }
+
+        UserAddressVO address = addressService.getAddress(userId, addressId);
+        CartProductVO product = productSkuService.listCartProducts(List.of(skuId)).stream()
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(ResultCode.NOT_FOUND, "秒杀SKU不存在"));
+        if (!ProductStatus.ON_SHELF.matches(product.getSpuStatus())
+                || !ProductStatus.ON_SHELF.matches(product.getSkuStatus())) {
+            throw bad("秒杀商品已下架");
+        }
+
+        BigDecimal unitPrice = money(seckillPrice);
+        BigDecimal amount = unitPrice.multiply(BigDecimal.valueOf(quantity)).setScale(2, RoundingMode.HALF_UP);
+        UserMembershipVO membership = membershipService.getCurrentMembership(userId);
+
+        LocalDateTime now = LocalDateTime.now();
+        MallOrder order = new MallOrder();
+        order.setOrderNo(orderNo);
+        order.setUserId(userId);
+        order.setStatus(OrderStatus.WAIT_PAY.getValue());
+        order.setTotalQuantity(quantity);
+        order.setProductAmount(amount);
+        order.setMemberDiscountAmount(BigDecimal.ZERO.setScale(2));
+        order.setCouponDiscountAmount(BigDecimal.ZERO.setScale(2));
+        order.setPayAmount(amount);
+        order.setMemberLevelCode(membership.getLevelCode());
+        order.setMemberDiscountRate(
+                membership.getDiscountRate() == null ? BigDecimal.ONE : membership.getDiscountRate());
+        order.setRecipientName(address.getRecipientName());
+        order.setRecipientMobile(address.getRecipientMobile());
+        order.setProvinceName(address.getProvinceName());
+        order.setCityName(address.getCityName());
+        order.setDistrictName(address.getDistrictName());
+        order.setDetailAddress(address.getDetailAddress());
+        order.setPostalCode(address.getPostalCode());
+        order.setRemark("秒杀订单");
+        order.setExpireAt(now.plusMinutes(PAY_MINUTES));
+        if (!save(order)) throw new BusinessException(ResultCode.INTERNAL_ERROR, "秒杀订单创建失败");
+
+        OrderItem item = new OrderItem();
+        item.setOrderId(order.getId());
+        item.setOrderNo(orderNo);
+        item.setSpuId(product.getSpuId());
+        item.setSkuId(skuId);
+        item.setProductName(product.getProductName());
+        item.setSkuName(product.getSkuName());
+        item.setSpecJson(product.getSpecJson());
+        item.setImageOssKey(product.getImageOssKey());
+        item.setUnitPrice(unitPrice);
+        item.setQuantity(quantity);
+        item.setSubtotal(amount);
+        if (!itemService.save(item)) throw new BusinessException(ResultCode.INTERNAL_ERROR, "秒杀订单商品保存失败");
+        saveLog(order, null, OrderStatus.WAIT_PAY, OrderOperationType.CREATE, userId, "创建秒杀订单");
+        return toVO(order, List.of(item));
     }
 
     @Override

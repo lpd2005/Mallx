@@ -7,7 +7,7 @@ import lombok.Getter;
 public enum InventoryOperationType {
     /** 入库或盘点增加可用库存。 */
     INCREASE_AVAILABLE(1),
-    /** 下单占用可用库存。 */
+    /** 普通下单占用或秒杀活动预留可用库存。 */
     LOCK(2),
     /** 支付或履约确认后最终扣减锁定库存。 */
     DEDUCT(3),

@@ -33,6 +33,9 @@ WHERE NOT EXISTS (SELECT 1 FROM auth_permission WHERE permission_code = 'rbac:ma
 INSERT INTO auth_permission(id, permission_code, permission_name, resource)
 SELECT 910010, 'audit:read', '后台审计查询', '/admin/operation-logs/**'
 WHERE NOT EXISTS (SELECT 1 FROM auth_permission WHERE permission_code = 'audit:read');
+INSERT INTO auth_permission(id, permission_code, permission_name, resource)
+SELECT 910011, 'seckill:manage', '秒杀活动管理', '/admin/seckill-activities/**'
+WHERE NOT EXISTS (SELECT 1 FROM auth_permission WHERE permission_code = 'seckill:manage');
 INSERT INTO auth_role(id, role_code, role_name, status)
 SELECT 920001, 'SYSTEM_ADMIN', '系统管理员', 1
 WHERE NOT EXISTS (SELECT 1 FROM auth_role WHERE role_code = 'SYSTEM_ADMIN');
@@ -45,12 +48,12 @@ INSERT INTO auth_role_permission(role_id, permission_id)
 SELECT role.id, permission.id
 FROM auth_role role CROSS JOIN auth_permission permission
 WHERE role.role_code = 'SYSTEM_ADMIN'
-  AND permission.permission_code IN ('admin:access', 'dashboard:read', 'product:manage', 'inventory:manage', 'order:manage', 'coupon:manage', 'after-sale:manage', 'user:manage', 'rbac:manage', 'audit:read')
+  AND permission.permission_code IN ('admin:access', 'dashboard:read', 'product:manage', 'inventory:manage', 'order:manage', 'coupon:manage', 'after-sale:manage', 'user:manage', 'rbac:manage', 'audit:read', 'seckill:manage')
   AND NOT EXISTS (SELECT 1 FROM auth_role_permission link WHERE link.role_id = role.id AND link.permission_id = permission.id);
 INSERT INTO auth_role_permission(role_id, permission_id)
 SELECT role.id, permission.id
 FROM auth_role role CROSS JOIN auth_permission permission
 WHERE role.role_code = 'OPERATOR'
-  AND permission.permission_code IN ('admin:access', 'dashboard:read', 'product:manage', 'inventory:manage', 'order:manage', 'coupon:manage', 'after-sale:manage')
+  AND permission.permission_code IN ('admin:access', 'dashboard:read', 'product:manage', 'inventory:manage', 'order:manage', 'coupon:manage', 'after-sale:manage', 'seckill:manage')
   AND NOT EXISTS (SELECT 1 FROM auth_role_permission link WHERE link.role_id = role.id AND link.permission_id = permission.id);
 COMMIT;

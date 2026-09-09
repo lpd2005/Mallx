@@ -19,6 +19,7 @@
         <dependency><groupId>com.mallx</groupId><artifactId>mall-cart</artifactId><version>${project.version}</version></dependency>
         <dependency><groupId>com.mallx</groupId><artifactId>mall-inventory</artifactId><version>${project.version}</version></dependency>
         <dependency><groupId>com.mallx</groupId><artifactId>mall-coupon</artifactId><version>${project.version}</version></dependency>
+        <dependency><groupId>com.mallx</groupId><artifactId>mall-product</artifactId><version>${project.version}</version></dependency>
         <dependency><groupId>com.baomidou</groupId><artifactId>mybatis-plus-spring</artifactId></dependency>
         <dependency><groupId>org.projectlombok</groupId><artifactId>lombok</artifactId><scope>provided</scope></dependency>
     </dependencies>

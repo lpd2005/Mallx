@@ -33,6 +33,22 @@ spring:
     port: ${mall.mq.port:5672}
     username: ${mall.mq.username:guest}
     password: ${mall.mq.pw:guest}
+    virtual-host: ${mall.mq.virtual-host:/}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      # 强制返回不可路由消息，使秒杀发送端可通过 CorrelationData 判断 Return。
+      mandatory: true
+    listener:
+      simple:
+        acknowledge-mode: auto
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 500ms
+          multiplier: 2
+          max-interval: 5s
 
 jetcache:
   statIntervalMinutes: 1
@@ -55,6 +71,12 @@ jetcache:
       expireAfterWriteInMillis: 600000
 
 mallx:
+  seckill:
+    request-ttl-seconds: 604800
+    pending-retry-delay-seconds: 10
+    pending-scan-interval-ms: 5000
+    closed-stock-release-interval-ms: 10000
+    pending-batch-size: 100
   cache:
     bloom:
       expected-insertions: 1000000

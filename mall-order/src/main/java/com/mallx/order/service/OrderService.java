@@ -6,11 +6,15 @@ import com.mallx.order.entity.MallOrder;
 import com.mallx.order.vo.*;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.List;
 
 /** 普通订单交易服务。 */
 public interface OrderService extends IService<MallOrder> {
     OrderVO createOrder(Long userId, CreateOrderRequest request);
+
+    /** 秒杀消费者调用的单商品幂等下单入口，requestNo 决定唯一订单号。 */
+    OrderVO createSeckillOrder(Long userId, Long skuId, int quantity, BigDecimal seckillPrice, Long addressId, String requestNo);
 
     List<OrderVO> listOrders(Long userId, Integer status);
 

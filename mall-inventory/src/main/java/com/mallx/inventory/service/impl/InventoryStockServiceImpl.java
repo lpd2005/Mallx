@@ -83,7 +83,7 @@ public class InventoryStockServiceImpl extends ServiceImpl<InventoryStockMapper,
         validate(skuId, quantity, businessNo);
         requireStock(skuId);
         InventoryOperation operation = beginOperation(skuId, quantity, businessNo, InventoryOperationType.LOCK,
-                "订单锁定库存");
+                "锁定可用库存");
         if (operation == null) return getStock(skuId);
 
         boolean updated = lambdaUpdate().eq(InventoryStock::getSkuId, skuId)
@@ -119,7 +119,7 @@ public class InventoryStockServiceImpl extends ServiceImpl<InventoryStockMapper,
         validate(skuId, quantity, businessNo);
         requireStock(skuId);
         InventoryOperation operation = beginOperation(skuId, quantity, businessNo, InventoryOperationType.RELEASE,
-                "订单取消释放库存");
+                "释放锁定库存");
         if (operation == null) return getStock(skuId);
 
         boolean updated = lambdaUpdate().eq(InventoryStock::getSkuId, skuId)
