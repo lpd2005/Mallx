@@ -1,6 +1,7 @@
-package com.mallx.seckill.controller;
+package com.mallx.admin.controller;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
+import com.mallx.admin.service.AdminOperationLogService;
 import com.mallx.common.result.Result;
 import com.mallx.seckill.dto.SeckillActivityRequest;
 import com.mallx.seckill.dto.SeckillItemRequest;
@@ -21,58 +22,87 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-/** 秒杀活动后台管理接口；所有操作统一要求 {@code seckill:manage} 权限。 */
+/** 秒杀活动后台管理接口；业务实现仍由 mall-seckill 模块负责。 */
 @RestController
 @RequestMapping("/admin/seckill-activities")
 @RequiredArgsConstructor
 @SaCheckPermission("seckill:manage")
 public class AdminSeckillController {
+    private final AdminOperationLogService operationLogService;
     private final SeckillActivityService activityService;
 
     /** 创建草稿活动；草稿尚不会写入 Redis。 */
     @PostMapping
     public Result<SeckillActivityVO> create(@Valid @RequestBody SeckillActivityRequest request) {
-        return Result.success(activityService.createActivity(request));
+        return Result.success(
+                operationLogService.execute(
+                        "seckill:create-activity",
+                        null,
+                        () -> activityService.createActivity(request)));
     }
 
     /** 修改草稿活动的名称和时间窗口。 */
     @PutMapping("/{activityId}")
     public Result<SeckillActivityVO> update(
             @PathVariable Long activityId, @Valid @RequestBody SeckillActivityRequest request) {
-        return Result.success(activityService.updateActivity(activityId, request));
+        return Result.success(
+                operationLogService.execute(
+                        "seckill:update-activity",
+                        activityId.toString(),
+                        () -> activityService.updateActivity(activityId, request)));
     }
 
     /** 向草稿活动加入一个已上架 SKU。 */
     @PostMapping("/{activityId}/items")
     public Result<SeckillItemVO> addItem(
             @PathVariable Long activityId, @Valid @RequestBody SeckillItemRequest request) {
-        return Result.success(activityService.addItem(activityId, request));
+        return Result.success(
+                operationLogService.execute(
+                        "seckill:add-item",
+                        activityId.toString(),
+                        () -> activityService.addItem(activityId, request)));
     }
 
     /** 修改草稿活动中的 SKU、价格、资格库存或限购数。 */
     @PutMapping("/{activityId}/items/{itemId}")
-    public Result<SeckillItemVO> updateItem(@PathVariable Long activityId, @PathVariable Long itemId,
-                                             @Valid @RequestBody SeckillItemRequest request) {
-        return Result.success(activityService.updateItem(activityId, itemId, request));
+    public Result<SeckillItemVO> updateItem(
+            @PathVariable Long activityId,
+            @PathVariable Long itemId,
+            @Valid @RequestBody SeckillItemRequest request) {
+        return Result.success(
+                operationLogService.execute(
+                        "seckill:update-item",
+                        itemTarget(activityId, itemId),
+                        () -> activityService.updateItem(activityId, itemId, request)));
     }
 
     /** 删除草稿活动中的秒杀商品。 */
     @DeleteMapping("/{activityId}/items/{itemId}")
     public Result<Void> removeItem(@PathVariable Long activityId, @PathVariable Long itemId) {
-        activityService.removeItem(activityId, itemId);
+        operationLogService.execute(
+                "seckill:remove-item",
+                itemTarget(activityId, itemId),
+                () -> activityService.removeItem(activityId, itemId));
         return Result.success();
     }
 
     /** 校验商品和真实库存后，把活动数据预热到 Redis 并开放抢购。 */
     @PostMapping("/{activityId}/prepare")
     public Result<SeckillActivityVO> prepare(@PathVariable Long activityId) {
-        return Result.success(activityService.prepareActivity(activityId));
+        return Result.success(
+                operationLogService.execute(
+                        "seckill:prepare-activity",
+                        activityId.toString(),
+                        () -> activityService.prepareActivity(activityId)));
     }
 
     /** 关闭活动并先更新数据库状态，再禁止 Redis 中的秒杀商品继续抢购。 */
     @PostMapping("/{activityId}/close")
     public Result<Void> close(@PathVariable Long activityId) {
-        activityService.closeActivity(activityId);
+        operationLogService.execute(
+                "seckill:close-activity",
+                activityId.toString(),
+                () -> activityService.closeActivity(activityId));
         return Result.success();
     }
 
@@ -86,5 +116,9 @@ public class AdminSeckillController {
     @GetMapping("/{activityId}")
     public Result<SeckillActivityVO> detail(@PathVariable Long activityId) {
         return Result.success(activityService.getActivity(activityId));
+    }
+
+    private String itemTarget(Long activityId, Long itemId) {
+        return activityId + "/" + itemId;
     }
 }
