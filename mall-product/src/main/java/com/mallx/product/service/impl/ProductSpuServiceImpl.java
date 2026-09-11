@@ -25,6 +25,7 @@ import com.mallx.product.mapper.ProductSkuMapper;
 import com.mallx.product.mapper.ProductSpuMapper;
 import com.mallx.product.service.ProductBrandService;
 import com.mallx.product.service.ProductCategoryService;
+import com.mallx.product.service.ProductSearchEventRecorder;
 import com.mallx.product.service.ProductSpuService;
 import com.mallx.product.vo.SpuVO;
 
@@ -46,6 +47,7 @@ public class ProductSpuServiceImpl extends ServiceImpl<ProductSpuMapper, Product
     private final ProductBrandService brandService;
     private final ProductSkuMapper productSkuMapper;
     private final ProductCacheInvalidator cacheInvalidator;
+    private final ProductSearchEventRecorder searchEventRecorder;
     private final RBloomFilter<Long> existingSpuIdBloomFilter;
 
     /** 简单单表条件用Lambda分页，不缓存价格，也不引入搜索引擎。 */
@@ -93,6 +95,7 @@ public class ProductSpuServiceImpl extends ServiceImpl<ProductSpuMapper, Product
         spu.setStatus(ProductStatus.DRAFT.getValue());
         save(spu);
         existingSpuIdBloomFilter.add(spu.getId());
+        searchEventRecorder.record(spu.getId());
         return spu;
     }
 
@@ -106,6 +109,7 @@ public class ProductSpuServiceImpl extends ServiceImpl<ProductSpuMapper, Product
         validateRelations(request);
         copy(request, spu);
         updateById(spu);
+        searchEventRecorder.record(spuId);
         return spu;
     }
 
@@ -129,6 +133,7 @@ public class ProductSpuServiceImpl extends ServiceImpl<ProductSpuMapper, Product
         if (!removeById(spuId)) {
             throw new BusinessException(ResultCode.NOT_FOUND, "SPU不存在");
         }
+        searchEventRecorder.record(spuId);
     }
 
     /** 修改SPU状态；没有已上架SKU时不能上架。 */
@@ -156,6 +161,7 @@ public class ProductSpuServiceImpl extends ServiceImpl<ProductSpuMapper, Product
                         .toList();
         lambdaUpdate().eq(ProductSpu::getId, spuId).set(ProductSpu::getStatus, status).update();
         cacheInvalidator.invalidateSkuByIds(childSkuIds);
+        searchEventRecorder.record(spuId);
     }
 
     /** 查询必须存在的有效SPU记录。 */

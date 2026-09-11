@@ -18,6 +18,7 @@ import com.mallx.product.entity.ProductSpu;
 import com.mallx.product.enums.ProductStatus;
 import com.mallx.product.mapper.ProductSkuMapper;
 import com.mallx.product.service.ProductSkuService;
+import com.mallx.product.service.ProductSearchEventRecorder;
 import com.mallx.product.service.ProductSpuService;
 import com.mallx.product.vo.CartProductVO;
 import com.mallx.product.vo.SkuVO;
@@ -41,6 +42,7 @@ public class ProductSkuServiceImpl extends ServiceImpl<ProductSkuMapper, Product
     private final ProductSpuService spuService;
     private final ProductSkuMapper productSkuMapper;
     private final ProductCacheInvalidator cacheInvalidator;
+    private final ProductSearchEventRecorder searchEventRecorder;
     private final RBloomFilter<Long> existingSkuIdBloomFilter;
 
     /** 创建初始状态为草稿的SKU。 */
@@ -54,6 +56,7 @@ public class ProductSkuServiceImpl extends ServiceImpl<ProductSkuMapper, Product
         sku.setStatus(ProductStatus.DRAFT.getValue());
         save(sku);
         existingSkuIdBloomFilter.add(sku.getId());
+        searchEventRecorder.record(sku.getSpuId());
         return sku;
     }
 
@@ -76,6 +79,7 @@ public class ProductSkuServiceImpl extends ServiceImpl<ProductSkuMapper, Product
         if (!oldSpuId.equals(request.getSpuId())) {
             cacheInvalidator.invalidateSpuAndSkuListBySpuIds(List.of(oldSpuId));
         }
+        searchEventRecorder.recordAll(List.of(oldSpuId, request.getSpuId()));
         return sku;
     }
 
@@ -93,6 +97,7 @@ public class ProductSkuServiceImpl extends ServiceImpl<ProductSkuMapper, Product
             throw new BusinessException(ResultCode.NOT_FOUND, "SKU不存在");
         }
         cacheInvalidator.invalidateSpuAndSkuListBySpuIds(List.of(sku.getSpuId()));
+        searchEventRecorder.record(sku.getSpuId());
     }
 
     /** 修改SKU状态并刷新SPU价格区间。 */
@@ -108,6 +113,7 @@ public class ProductSkuServiceImpl extends ServiceImpl<ProductSkuMapper, Product
         lambdaUpdate().eq(ProductSku::getId, skuId).set(ProductSku::getStatus, status).update();
         refreshPriceRange(sku.getSpuId());
         cacheInvalidator.invalidateSpuAndSkuListBySpuIds(List.of(sku.getSpuId()));
+        searchEventRecorder.record(sku.getSpuId());
     }
 
     /** 获取必须存在的SKU，库存初始化会调用此方法校验商品。 */

@@ -18,6 +18,7 @@ import com.mallx.product.entity.ProductSpu;
 import com.mallx.product.mapper.ProductBrandMapper;
 import com.mallx.product.mapper.ProductSpuMapper;
 import com.mallx.product.service.ProductBrandService;
+import com.mallx.product.service.ProductSearchEventRecorder;
 import com.mallx.product.vo.BrandVO;
 
 import lombok.RequiredArgsConstructor;
@@ -35,6 +36,7 @@ public class ProductBrandServiceImpl extends ServiceImpl<ProductBrandMapper, Pro
         implements ProductBrandService {
     private static final int ENABLED = 1;
     private final ProductSpuMapper productSpuMapper;
+    private final ProductSearchEventRecorder searchEventRecorder;
 
     /** 查询前台可见品牌。 */
     @Override
@@ -75,6 +77,16 @@ public class ProductBrandServiceImpl extends ServiceImpl<ProductBrandMapper, Pro
         ensureUnique(brandId, request.getBrandName());
         copy(request, brand);
         updateById(brand);
+        List<Long> affectedSpuIds =
+                productSpuMapper
+                        .selectList(
+                                Wrappers.<ProductSpu>lambdaQuery()
+                                        .select(ProductSpu::getId)
+                                        .eq(ProductSpu::getBrandId, brandId))
+                        .stream()
+                        .map(ProductSpu::getId)
+                        .toList();
+        searchEventRecorder.recordAll(affectedSpuIds);
         return brand;
     }
 

@@ -49,6 +49,12 @@ spring:
           initial-interval: 500ms
           multiplier: 2
           max-interval: 5s
+  elasticsearch:
+    uris: ${mall.search.elasticsearch.uris:http://localhost:9200}
+    username: ${mall.search.elasticsearch.username:}
+    password: ${mall.search.elasticsearch.password:}
+    connection-timeout: 3s
+    socket-timeout: 10s
 
 jetcache:
   statIntervalMinutes: 1
@@ -71,6 +77,14 @@ jetcache:
       expireAfterWriteInMillis: 600000
 
 mallx:
+  search:
+    index-alias: product_index
+    rebuild-batch-size: 200
+    hot-word-limit: 10
+    outbox:
+      batch-size: 100
+      publish-interval-ms: 5000
+      retry-delay-seconds: 10
   seckill:
     request-ttl-seconds: 604800
     pending-retry-delay-seconds: 10

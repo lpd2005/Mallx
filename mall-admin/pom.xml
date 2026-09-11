@@ -20,6 +20,7 @@
         <dependency><groupId>com.mallx</groupId><artifactId>mall-order</artifactId><version>${project.version}</version></dependency>
         <dependency><groupId>com.mallx</groupId><artifactId>mall-coupon</artifactId><version>${project.version}</version></dependency>
         <dependency><groupId>com.mallx</groupId><artifactId>mall-seckill</artifactId><version>${project.version}</version></dependency>
+        <dependency><groupId>com.mallx</groupId><artifactId>mall-search</artifactId><version>${project.version}</version></dependency>
         <dependency><groupId>com.mallx</groupId><artifactId>mall-after-sale</artifactId><version>${project.version}</version></dependency>
 
         <dependency>

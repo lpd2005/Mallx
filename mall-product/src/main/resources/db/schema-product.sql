@@ -69,3 +69,18 @@ CREATE TABLE IF NOT EXISTS product_sku (
     CONSTRAINT chk_product_sku_sale_price CHECK (sale_price >= 0),
     CONSTRAINT chk_product_sku_market_price CHECK (market_price IS NULL OR market_price >= sale_price)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='库存量单位SKU';
+
+CREATE TABLE IF NOT EXISTS product_search_outbox (
+    id BIGINT NOT NULL COMMENT 'Outbox主键',
+    event_id VARCHAR(64) NOT NULL COMMENT '消息事件ID',
+    spu_id BIGINT NOT NULL COMMENT '需要重建索引的SPU ID',
+    status TINYINT NOT NULL DEFAULT 0 COMMENT '状态：0待发送，1已发送',
+    retry_count INT NOT NULL DEFAULT 0 COMMENT '投递次数',
+    next_retry_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '下次允许投递时间',
+    last_error VARCHAR(500) DEFAULT NULL COMMENT '最近一次投递失败原因',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    sent_at DATETIME DEFAULT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_product_search_outbox_event (event_id),
+    KEY idx_product_search_outbox_pending (status, next_retry_at, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商品搜索索引事件Outbox';

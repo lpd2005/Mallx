@@ -18,6 +18,7 @@ import com.mallx.product.entity.ProductSpu;
 import com.mallx.product.mapper.ProductCategoryMapper;
 import com.mallx.product.mapper.ProductSpuMapper;
 import com.mallx.product.service.ProductCategoryService;
+import com.mallx.product.service.ProductSearchEventRecorder;
 import com.mallx.product.vo.CategoryVO;
 
 import lombok.RequiredArgsConstructor;
@@ -39,6 +40,7 @@ public class ProductCategoryServiceImpl extends ServiceImpl<ProductCategoryMappe
     private static final int ENABLED = 1;
     private static final int MAX_LEVEL = 3;
     private final ProductSpuMapper productSpuMapper;
+    private final ProductSearchEventRecorder searchEventRecorder;
 
     /** 查询并在内存中组装分类树。 */
     @Override
@@ -106,6 +108,16 @@ public class ProductCategoryServiceImpl extends ServiceImpl<ProductCategoryMappe
         category.setCategoryLevel(level);
         validateEnabled(category.getEnabled());
         updateById(category);
+        List<Long> affectedSpuIds =
+                productSpuMapper
+                        .selectList(
+                                Wrappers.<ProductSpu>lambdaQuery()
+                                        .select(ProductSpu::getId)
+                                        .eq(ProductSpu::getCategoryId, categoryId))
+                        .stream()
+                        .map(ProductSpu::getId)
+                        .toList();
+        searchEventRecorder.recordAll(affectedSpuIds);
         return category;
     }
 

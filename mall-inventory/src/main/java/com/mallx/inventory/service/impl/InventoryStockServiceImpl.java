@@ -13,6 +13,7 @@ import com.mallx.inventory.service.InventoryOperationService;
 import com.mallx.inventory.service.InventoryStockService;
 import com.mallx.inventory.vo.InventoryStockVO;
 import com.mallx.product.service.ProductSkuService;
+import com.mallx.product.service.ProductSearchEventRecorder;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +32,7 @@ public class InventoryStockServiceImpl extends ServiceImpl<InventoryStockMapper,
     private final InventoryOperationMapper operationMapper;
     private final InventoryOperationService operationService;
     private final ProductSkuService skuService;
+    private final ProductSearchEventRecorder searchEventRecorder;
 
     /** 查询SKU当前库存，不存在时明确提示尚未初始化。 */
     @Override
@@ -73,7 +75,9 @@ public class InventoryStockServiceImpl extends ServiceImpl<InventoryStockMapper,
         boolean updated = lambdaUpdate().eq(InventoryStock::getSkuId, skuId)
                 .setSql("available_stock = available_stock + " + quantity).update();
         if (!updated) throw new BusinessException(ResultCode.NOT_FOUND, "SKU库存不存在");
-        return finishOperation(operation, requireStock(skuId));
+        InventoryStockVO result = finishOperation(operation, requireStock(skuId));
+        recordSearchSync(skuId);
+        return result;
     }
 
     /** 原子地将可用库存转为锁定库存。 */
@@ -91,7 +95,9 @@ public class InventoryStockServiceImpl extends ServiceImpl<InventoryStockMapper,
                 .setSql("available_stock = available_stock - " + quantity)
                 .setSql("locked_stock = locked_stock + " + quantity).update();
         if (!updated) throw new BusinessException(ResultCode.BAD_REQUEST, "可用库存不足");
-        return finishOperation(operation, requireStock(skuId));
+        InventoryStockVO result = finishOperation(operation, requireStock(skuId));
+        recordSearchSync(skuId);
+        return result;
     }
 
     /** 原子地将锁定库存转为已售库存。 */
@@ -109,7 +115,9 @@ public class InventoryStockServiceImpl extends ServiceImpl<InventoryStockMapper,
                 .setSql("locked_stock = locked_stock - " + quantity)
                 .setSql("sold_stock = sold_stock + " + quantity).update();
         if (!updated) throw new BusinessException(ResultCode.BAD_REQUEST, "锁定库存不足，无法扣减");
-        return finishOperation(operation, requireStock(skuId));
+        InventoryStockVO result = finishOperation(operation, requireStock(skuId));
+        recordSearchSync(skuId);
+        return result;
     }
 
     /** 原子地将锁定库存释放回可用库存。 */
@@ -127,7 +135,9 @@ public class InventoryStockServiceImpl extends ServiceImpl<InventoryStockMapper,
                 .setSql("locked_stock = locked_stock - " + quantity)
                 .setSql("available_stock = available_stock + " + quantity).update();
         if (!updated) throw new BusinessException(ResultCode.BAD_REQUEST, "锁定库存不足，无法释放");
-        return finishOperation(operation, requireStock(skuId));
+        InventoryStockVO result = finishOperation(operation, requireStock(skuId));
+        recordSearchSync(skuId);
+        return result;
     }
 
     /** 售后回补与原订单锁定、扣减使用不同流水类型，不影响原库存幂等记录。 */
@@ -146,7 +156,9 @@ public class InventoryStockServiceImpl extends ServiceImpl<InventoryStockMapper,
         if (!updated) {
             throw new BusinessException(ResultCode.NOT_FOUND, "SKU库存不存在");
         }
-        return finishOperation(operation, requireStock(skuId));
+        InventoryStockVO result = finishOperation(operation, requireStock(skuId));
+        recordSearchSync(skuId);
+        return result;
     }
 
     /** 先以唯一业务键插入处理中流水，插入失败表示相同操作已经完成。 */
@@ -221,6 +233,10 @@ public class InventoryStockServiceImpl extends ServiceImpl<InventoryStockMapper,
         if (remark == null || remark.isBlank()) return null;
         String value = remark.trim();
         return value.length() > 255 ? value.substring(0, 255) : value;
+    }
+
+    private void recordSearchSync(Long skuId) {
+        searchEventRecorder.record(skuService.requireSku(skuId).getSpuId());
     }
 
     private InventoryStockVO toVO(InventoryStock stock) {
