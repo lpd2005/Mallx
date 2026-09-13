@@ -7,6 +7,7 @@ export function initApi(router, pinia) {
   api = createApi({
     baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
     session: () => session.auth,
+    updateSession: (auth) => session.renew(auth),
     onUnauthorized: () => {
       session.clear()
       if (router.currentRoute.value.path !== '/login')

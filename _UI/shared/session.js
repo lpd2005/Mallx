@@ -17,12 +17,16 @@ export function sessionStore(key) {
       sessionStorage.setItem(key, JSON.stringify(value))
       admin.value = null
     }
+    function renew(value) {
+      auth.value = value
+      sessionStorage.setItem(key, JSON.stringify(value))
+    }
     function clear() {
       auth.value = null
       admin.value = null
       sessionStorage.removeItem(key)
     }
     const can = (permission) => admin.value?.permissions?.includes(permission) || false
-    return { auth, admin, loggedIn, save, clear, can }
+    return { auth, admin, loggedIn, save, renew, clear, can }
   })
 }

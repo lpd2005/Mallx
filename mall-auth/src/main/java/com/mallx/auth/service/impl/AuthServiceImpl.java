@@ -1,9 +1,8 @@
 package com.mallx.auth.service.impl;
 
-import cn.dev33.satoken.stp.StpUtil;
-
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.mallx.auth.dto.LoginRequest;
+import com.mallx.auth.dto.RefreshTokenRequest;
 import com.mallx.auth.dto.RegisterRequest;
 import com.mallx.auth.entity.AuthAccount;
 import com.mallx.auth.enums.AccountStatus;
@@ -43,6 +42,9 @@ public class AuthServiceImpl implements AuthService {
 
     /** 账号与资料共用MySQL本地事务，不引入消息队列或异步初始化。 */
     private final UserProfileService userProfileService;
+
+    /** 统一维护Access Token与Refresh Token的签发、轮换及成对注销。 */
+    private final AuthTokenService authTokenService;
 
     /** 唯一索引兜底并发注册，资料初始化失败时连同账号一起回滚。 */
     @Override
@@ -88,19 +90,21 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException(ResultCode.FORBIDDEN, "账号已被禁用");
         }
 
-        // Sa-Token 负责生成、保存并向 Redis 同步当前登录会话。
-        StpUtil.login(account.getId());
+        // Access由Sa-Token维护；Refresh以不可被业务鉴权识别的不透明令牌保存到Redis。
+        LoginResponse response = authTokenService.issue(account.getId());
         log.info("User login succeeded, userId={}", account.getId());
-        return new LoginResponse(account.getId(), StpUtil.getTokenName(), StpUtil.getTokenValue());
+        return response;
+    }
+
+    @Override
+    public LoginResponse refresh(RefreshTokenRequest request) {
+        return authTokenService.refresh(request.getRefreshToken());
     }
 
     @Override
     public void logout() {
-        if (currentUserProvider.isLogin()) {
-            // 注销应允许禁用账号清理旧会话，不再触发账号启用状态校验。
-            log.info("User logout, userId={}", StpUtil.getLoginId());
-            StpUtil.logout();
-        }
+        // 注销应允许禁用账号清理旧会话，不再触发账号启用状态校验。
+        authTokenService.logoutCurrent();
     }
 
     @Override

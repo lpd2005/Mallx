@@ -47,6 +47,13 @@ JOIN pressure_order ON pressure_order.id = order_operation_log.order_id;
 DELETE order_item FROM order_item JOIN pressure_order ON pressure_order.id = order_item.order_id;
 DELETE mall_order FROM mall_order JOIN pressure_order ON pressure_order.id = mall_order.id;
 
+-- 清理上一轮秒杀压测快照和活动，避免订单已重置但异步请求仍指向旧订单。
+DELETE FROM seckill_order_request WHERE user_id BETWEEN 30001 AND 30500;
+DELETE seckill_item FROM seckill_item
+JOIN seckill_activity ON seckill_activity.id = seckill_item.activity_id
+WHERE seckill_activity.activity_name LIKE 'PRESSURE-SECKILL-%';
+DELETE FROM seckill_activity WHERE activity_name LIKE 'PRESSURE-SECKILL-%';
+
 DELETE FROM coupon_operation_log
 WHERE user_id BETWEEN 30001 AND 30500 OR user_coupon_id IN (
     SELECT id FROM coupon_user WHERE template_id = 70001

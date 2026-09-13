@@ -1,6 +1,7 @@
 package com.mallx.auth.controller;
 
 import com.mallx.auth.dto.LoginRequest;
+import com.mallx.auth.dto.RefreshTokenRequest;
 import com.mallx.auth.dto.RegisterRequest;
 import com.mallx.auth.service.AuthService;
 import com.mallx.auth.vo.CurrentUserResponse;
@@ -46,6 +47,13 @@ public class AuthController {
         return Result.success(authService.login(request));
     }
 
+    /** 使用Refresh Token轮换新的Access Token和Refresh Token。 */
+    @Public
+    @PostMapping("/refresh")
+    public Result<LoginResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
+        return Result.success(authService.refresh(request));
+    }
+
     /**
      * 注销当前会话。
      *
@@ -67,6 +75,4 @@ public class AuthController {
     public Result<CurrentUserResponse> currentUser() {
         return Result.success(authService.currentUser());
     }
-
-    // TODO 双令牌设计
 }

@@ -101,6 +101,40 @@ body {
 .catalog-intro .el-input {
   width: 360px;
 }
+.catalog-intro .el-autocomplete {
+  width: 420px;
+}
+.hot-words {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: -12px 0 24px;
+  font-size: 13px;
+}
+.search-filters {
+  display: grid;
+  grid-template-columns: 1.2fr 100px auto 100px 1fr 1.2fr;
+  gap: 10px;
+  align-items: center;
+  padding: 14px;
+  margin-bottom: 18px;
+  border: 1px solid #e1e8e4;
+  border-radius: 10px;
+  background: #fff;
+}
+.product-card h3 em,
+.product-card p em {
+  color: #d83434;
+  font-style: normal;
+}
+.product-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  font-size: 12px;
+}
 .catalog-layout {
   display: grid;
   grid-template-columns: 204px minmax(0, 1fr);
@@ -398,6 +432,79 @@ body {
   border-radius: 8px !important;
   box-shadow: none !important;
 }
+.seckill-activity {
+  margin-bottom: 32px;
+}
+.seckill-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 20px;
+  padding: 22px 26px;
+  border-radius: 14px 14px 0 0;
+  background: #48211e;
+  color: #fff;
+}
+.seckill-heading h2 {
+  display: inline-block;
+  margin: 0 0 0 12px;
+}
+.seckill-heading .muted {
+  color: #e7c5bf;
+}
+.seckill-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  padding: 22px;
+  border: 1px solid #eadbd7;
+  border-top: 0;
+  border-radius: 0 0 14px 14px;
+  background: #fff8f6;
+}
+.seckill-card {
+  overflow: hidden;
+  border: 1px solid #ead8d3;
+  border-radius: 12px;
+  background: #fff;
+}
+.seckill-card .picture {
+  width: 100%;
+  aspect-ratio: 1;
+}
+.seckill-copy {
+  padding: 18px;
+}
+.seckill-copy h3,
+.seckill-copy > p {
+  margin: 0 0 9px;
+}
+.seckill-price {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin: 14px 0;
+}
+.seckill-price .price {
+  color: #d83a2f;
+  font-size: 28px;
+}
+.seckill-price del {
+  color: #9baaa4;
+  font-size: 13px;
+}
+.seckill-copy > .el-button {
+  width: 100%;
+  margin-top: 10px;
+}
+.seckill-result {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 32px;
+  margin: 12px 0;
+}
 .breadcrumb {
   margin-bottom: 25px;
 }
@@ -450,6 +557,9 @@ body {
     font-size: 30px;
   }
   .catalog-intro .el-input {
+    width: 100%;
+  }
+  .catalog-intro .el-autocomplete {
     width: 100%;
   }
   .catalog-layout {
@@ -507,6 +617,20 @@ body {
   }
   .catalog-bar {
     gap: 12px;
+  }
+  .search-filters {
+    grid-template-columns: 1fr 1fr;
+  }
+  .search-filters > span {
+    display: none;
+  }
+  .seckill-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .seckill-grid {
+    grid-template-columns: 1fr;
+    padding: 14px;
   }
   .line-item .picture {
     width: 62px;

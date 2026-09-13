@@ -27,6 +27,7 @@ function logout() {
       </RouterLink>
       <nav>
         <RouterLink to="/">发现好物</RouterLink>
+        <RouterLink to="/seckill">限时秒杀</RouterLink>
         <RouterLink to="/coupons">领券中心</RouterLink>
         <RouterLink to="/orders">我的订单</RouterLink>
       </nav>

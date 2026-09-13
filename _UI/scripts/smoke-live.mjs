@@ -17,6 +17,18 @@ for (const origin of origins) {
   assert.ok(Array.isArray(categories))
   assert.ok(Array.isArray(brands))
   count += 2
+  const searchPage = await api.get('/search/products', { current: 1, size: 2 })
+  assert.ok(Array.isArray(searchPage.records))
+  assert.ok(Number(searchPage.total) >= 0)
+  const hotWords = await api.get('/search/hot-words')
+  assert.ok(Array.isArray(hotWords))
+  const suggestions = await api.get('/search/suggestions', {
+    keyword: hotWords[0] || '手机',
+  })
+  assert.ok(Array.isArray(suggestions))
+  const seckillActivities = await api.get('/seckill/activities')
+  assert.ok(Array.isArray(seckillActivities))
+  count += 4
   if (page.records.length) {
     const product = page.records[0]
     assert.ok(typeof product.id === 'string' || Number.isSafeInteger(product.id))
@@ -41,6 +53,6 @@ for (const origin of origins) {
     )
     count++
   }
-  console.log(`PASS ${origin}：商品、分类、品牌、详情、鉴权边界`)
+  console.log(`PASS ${origin}：商品、搜索、秒杀、分类、品牌、详情、鉴权边界`)
 }
 console.log(`只读联调通过：${count} 项检查。`)

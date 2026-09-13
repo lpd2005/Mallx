@@ -15,6 +15,8 @@ import Coupons from '../storefront/src/views/Coupons.vue'
 import Account from '../storefront/src/views/Account.vue'
 import Addresses from '../storefront/src/views/Addresses.vue'
 import AfterSales from '../storefront/src/views/AfterSales.vue'
+import Seckill from '../storefront/src/views/Seckill.vue'
+import { useSession } from '../storefront/src/services.js'
 
 const id = '2095845066894499842'
 const product = {
@@ -48,13 +50,56 @@ const order = {
   fullAddress: '测试地址',
 }
 let wrappers = [],
-  api
+  api,
+  pinia
 beforeEach(() => {
   sessionStorage.clear()
-  setActivePinia(createPinia())
+  pinia = createPinia()
+  setActivePinia(pinia)
   api = {
     get: vi.fn(async (url) => {
       if (url === '/products') return { records: [product], total: 1 }
+      if (url === '/search/products')
+        return {
+          records: [
+            {
+              spuId: id,
+              productName: '测试商品',
+              highlightedProductName: '<em>测试</em>商品',
+              subtitle: '商品介绍',
+              highlightedSubtitle: '商品介绍',
+              minPrice: 100,
+              maxPrice: 100,
+              hasStock: true,
+              soldCount: 5,
+            },
+          ],
+          total: 1,
+        }
+      if (url === '/search/hot-words') return ['手机']
+      if (url === '/search/suggestions') return ['测试商品']
+      if (url === '/seckill/activities')
+        return [
+          {
+            activityId: id,
+            activityName: '限时专场',
+            startAt: '2020-01-01T00:00:00',
+            endAt: '2099-01-01T00:00:00',
+            status: 1,
+            items: [
+              {
+                itemId: id,
+                skuId: id,
+                seckillPrice: 80,
+                totalStock: 10,
+                soldStock: 2,
+                limitPerUser: 1,
+                status: 1,
+              },
+            ],
+          },
+        ]
+      if (url === `/products/skus/${id}`) return { id, spuId: id, skuName: '黑色', salePrice: 100 }
       if (url === '/products/categories') return [{ id, categoryName: '分类', children: [] }]
       if (url === '/products/brands') return [{ id, brandName: '品牌' }]
       if (url.endsWith('/skus'))
@@ -90,13 +135,12 @@ beforeEach(() => {
       if (url === '/users/me/after-sales') return { records: [], total: 0 }
       return []
     }),
-    post: vi.fn(async (url) =>
-      url.endsWith('/payments')
-        ? { paymentNo: 'PAY-1', amount: 100 }
-        : url === '/users/me/orders'
-          ? order
-          : { tokenName: 'Authorization', tokenValue: 'session' },
-    ),
+    post: vi.fn(async (url) => {
+      if (url.endsWith('/payments')) return { paymentNo: 'PAY-1', amount: 100 }
+      if (url === '/users/me/orders') return order
+      if (url.includes('/seckill/items/')) return { requestNo: 'REQUEST-1', status: 0 }
+      return { tokenName: 'Authorization', tokenValue: 'session' }
+    }),
     put: vi.fn(),
     patch: vi.fn(),
     delete: vi.fn(),
@@ -121,7 +165,7 @@ async function render(component, path = '/') {
   await router.isReady()
   const wrapper = mount(component, {
     attachTo: document.body,
-    global: { plugins: [createPinia(), router, ElementPlus], provide: { api } },
+    global: { plugins: [pinia, router, ElementPlus], provide: { api } },
   })
   wrappers.push(wrapper)
   await flushPromises()
@@ -140,6 +184,7 @@ describe('商城页面', () => {
     ['个人资料', Account, '/account', '普通会员'],
     ['收货地址', Addresses, '/addresses', '测试用户'],
     ['售后列表', AfterSales, '/after-sales', '售后服务'],
+    ['秒杀活动', Seckill, '/seckill', '限时专场'],
   ])
     it(`${name}按接口数据渲染`, async () => {
       const { wrapper } = await render(component, path)
@@ -157,6 +202,29 @@ describe('商城页面', () => {
       password: 'password123',
     })
     expect(wrapper.emitted('authenticated')[0][0].tokenValue).toBe('session')
+  })
+  it('秒杀提交地址和数量并展示异步处理中状态', async () => {
+    useSession().save({
+      tokenName: 'Authorization',
+      tokenValue: 'access-token',
+      refreshToken: 'refresh-token',
+    })
+    const { wrapper } = await render(Seckill, '/seckill')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === '立即抢购')
+      .trigger('click')
+    await flushPromises()
+    const submit = [...document.querySelectorAll('button')].find(
+      (button) => button.textContent.trim() === '提交抢购',
+    )
+    submit.click()
+    await flushPromises()
+    expect(api.post).toHaveBeenCalledWith(`/seckill/items/${id}/purchase`, {
+      addressId: id,
+      quantity: 1,
+    })
+    expect(wrapper.text()).toContain('订单处理中')
   })
   it('结算使用会员折后金额查券，下单只传地址/券/备注', async () => {
     const { wrapper, router } = await render(Checkout, '/checkout')

@@ -7,6 +7,8 @@ const pages = {
   '/orders': () => import('./views/Orders.vue'),
   '/after-sales': () => import('./views/AfterSales.vue'),
   '/assignments': () => import('./views/Assignments.vue'),
+  '/search': () => import('./views/SearchOps.vue'),
+  '/seckill': () => import('./views/Seckill.vue'),
 }
 const router = createRouter({
   history: createWebHistory(),

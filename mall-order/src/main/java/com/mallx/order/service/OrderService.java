@@ -32,6 +32,10 @@ public interface OrderService extends IService<MallOrder> {
 
     void markPaid(String orderNo, String paymentNo, LocalDateTime paidAt);
 
+    /** 延迟消息调用的单订单关单入口；返回true表示本次实际完成关闭。 */
+    boolean closeExpiredOrder(String orderNo);
+
+    /** MQ漏投或消费异常时使用的数据库批量补偿入口。 */
     int closeExpiredOrders(int batchSize);
 
     /** 在调用方事务中锁定订单并进入售后；returnRequired区分未发货退款和退货退款。 */

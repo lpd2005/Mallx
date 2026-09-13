@@ -9,10 +9,13 @@ import com.mallx.common.exception.BusinessException;
 import com.mallx.coupon.service.CouponUserService;
 import com.mallx.coupon.vo.CouponCalculationVO;
 import com.mallx.inventory.service.InventoryStockService;
+import com.mallx.order.config.OrderProperties;
 import com.mallx.order.dto.CreateOrderRequest;
 import com.mallx.order.entity.*;
 import com.mallx.order.enums.*;
 import com.mallx.order.mapper.MallOrderMapper;
+import com.mallx.order.message.OrderTimeoutMessage;
+import com.mallx.order.publisher.OrderTimeoutMessagePublisher;
 import com.mallx.order.service.*;
 import com.mallx.order.vo.*;
 import com.mallx.product.enums.ProductStatus;
@@ -40,7 +43,6 @@ import java.util.stream.Collectors;
 public class OrderServiceImpl extends ServiceImpl<MallOrderMapper, MallOrder>
         implements OrderService {
     private static final int MAX_BATCH = 500; // 一次性处理的最大订单数
-    private static final int PAY_MINUTES = 30;// 支付超时分钟数
     private final MallOrderMapper orderMapper;
     private final OrderItemService itemService;
     private final OrderOperationLogService logService;
@@ -50,6 +52,8 @@ public class OrderServiceImpl extends ServiceImpl<MallOrderMapper, MallOrder>
     private final InventoryStockService inventoryService;
     private final CouponUserService couponService;
     private final ProductSkuService productSkuService;
+    private final OrderProperties orderProperties;
+    private final OrderTimeoutMessagePublisher timeoutMessagePublisher;
 
     /** 从购物车已勾选项重新取价并创建订单；Redis购物车只在事务提交后清理。 */
     @Override
@@ -88,6 +92,7 @@ public class OrderServiceImpl extends ServiceImpl<MallOrderMapper, MallOrder>
             throw new BusinessException(ResultCode.INTERNAL_ERROR, "订单商品保存失败"); // 批量保存订单明细，失败抛出异常回滚
         if (couponUserId != null) couponService.confirmUsed(couponUserId, orderNo); // 订单数据落库成功后确认用券，券状态由锁定转为已使用
         saveLog(order, null, OrderStatus.WAIT_PAY, OrderOperationType.CREATE, userId, "创建订单"); // 记录订单创建操作流水
+        scheduleTimeout(order); // 事务提交成功后再发送延迟关单消息
         afterCommitClearCart(userId, cartItems.stream().map(CartItemVO::getSkuId).toList()); // 注册事务提交后回调，成功提交才清理Redis购物车
         return toVO(order, items); // 组装订单视图返回
     }
@@ -144,7 +149,7 @@ public class OrderServiceImpl extends ServiceImpl<MallOrderMapper, MallOrder>
         order.setDetailAddress(address.getDetailAddress());
         order.setPostalCode(address.getPostalCode());
         order.setRemark("秒杀订单");
-        order.setExpireAt(now.plusMinutes(PAY_MINUTES));
+        order.setExpireAt(now.plus(orderProperties.getPaymentTimeout()));
         if (!save(order)) throw new BusinessException(ResultCode.INTERNAL_ERROR, "秒杀订单创建失败");
 
         OrderItem item = new OrderItem();
@@ -161,6 +166,7 @@ public class OrderServiceImpl extends ServiceImpl<MallOrderMapper, MallOrder>
         item.setSubtotal(amount);
         if (!itemService.save(item)) throw new BusinessException(ResultCode.INTERNAL_ERROR, "秒杀订单商品保存失败");
         saveLog(order, null, OrderStatus.WAIT_PAY, OrderOperationType.CREATE, userId, "创建秒杀订单");
+        scheduleTimeout(order);
         return toVO(order, List.of(item));
     }
 
@@ -284,8 +290,29 @@ public class OrderServiceImpl extends ServiceImpl<MallOrderMapper, MallOrder>
         saveLog(o, before, OrderStatus.PAID, OrderOperationType.PAY, null, "支付单" + paymentNo + "支付成功");
     }
 
-    //TODO MQ延迟消息
-    /** 当前阶段使用数据库定时扫描关闭超时待支付订单，后续再替换为MQ延迟消息。 */
+    /**
+     * 延迟消息触发的精确关单入口。
+     * 行锁串行化支付、用户取消和超时关闭，状态及过期时间的二次检查保证重复消息幂等。
+     */
+    @Override
+    @Transactional
+    public boolean closeExpiredOrder(String orderNo) {
+        String normalized = requireNo(orderNo);
+        MallOrder order = orderMapper.selectByOrderNoForUpdate(normalized);
+        if (order == null || !OrderStatus.WAIT_PAY.matches(order.getStatus())) {
+            return false;
+        }
+        if (order.getExpireAt() == null) {
+            throw new BusinessException(ResultCode.INTERNAL_ERROR, "订单缺少支付过期时间");
+        }
+        if (order.getExpireAt().isAfter(LocalDateTime.now())) {
+            return false;
+        }
+        cancelLocked(order, "订单超时未支付", null, OrderOperationType.TIMEOUT_CLOSE);
+        return true;
+    }
+
+    /** MQ异常时低频扫描数据库，保证漏投的待支付订单最终收敛。 */
     @Override
     @Transactional
     public int closeExpiredOrders(int batchSize) {
@@ -511,8 +538,14 @@ public class OrderServiceImpl extends ServiceImpl<MallOrderMapper, MallOrder>
         o.setDetailAddress(a.getDetailAddress());
         o.setPostalCode(a.getPostalCode());
         o.setRemark(trim(r.getRemark(), 255));
-        o.setExpireAt(now.plusMinutes(PAY_MINUTES));
+        o.setExpireAt(now.plus(orderProperties.getPaymentTimeout()));
         return o;
+    }
+
+    /** 普通订单和秒杀订单统一注册事务提交后的延迟消息。 */
+    private void scheduleTimeout(MallOrder order) {
+        timeoutMessagePublisher.sendAfterCommit(
+                new OrderTimeoutMessage(order.getOrderNo(), order.getExpireAt()));
     }
 
     private OrderItem buildItem(MallOrder o, CartItemVO c) {

@@ -152,15 +152,44 @@ HAVING count > 1;
 
 期望：成功订单100、支付记录100且全部已支付、订单100个进入已支付状态；热点SKU应为`available_stock=0`、`locked_stock=0`、`sold_stock=100`，扣减流水应恰好100条且没有重复。
 
+## 6. 500用户并发秒杀100件库存
+
+先执行数据SQL，再通过后台接口创建包含SKU `60002`、资格库存100、每人限购1件的活动并执行预热。取得返回的秒杀商品ID后运行：
+
+```powershell
+& 'D:\JMeter\apache-jmeter-5.6.3\apache-jmeter-5.6.3\bin\jmeter.bat' `
+  -n -t scripts/performance/mallx-mvp.jmx `
+  -Jscenario=seckill -Jthreads=500 -Jramp=10 -Jloops=1 `
+  -JsyncUsers=500 -JseckillItemId=<秒杀商品ID> -Jport=8080 `
+  -l target/jmeter-seckill/result.jtl -e -o target/jmeter-seckill/html
+```
+
+所有线程登录完成后在抢购接口前集合并同时释放。100个资格预扣成功、400个“秒杀商品已售罄”属于正确结果；后者会被标记为预期拒绝，不计为系统错误。压测后还必须等待异步消费收敛，并联合检查：
+
+```sql
+SELECT status, COUNT(*) FROM seckill_order_request
+WHERE activity_id = <活动ID> GROUP BY status;
+
+SELECT total_stock, sold_stock FROM seckill_item WHERE id = <秒杀商品ID>;
+SELECT available_stock, locked_stock, sold_stock
+FROM inventory_stock WHERE sku_id = 60002;
+```
+
+正常期望为成功请求100、正式订单100、活动销量100，库存为`0/100/0`（订单尚未支付）。同时应确认Redis资格库存为0、待处理计数和ZSet归零，RabbitMQ业务队列及死信队列均为空。
+
+验证异步削峰时，可仅在测试进程中设置`spring.rabbitmq.listener.simple.auto-startup=false`关闭消费者：抢购结束后应看到RabbitMQ积压100条、MySQL订单仍为0；随后恢复消费者，应准确生成100单并清空队列。该操作只用于测试，不能作为生产配置。
+
 ## 参数与限制
 
-- `scenario`：`product`、`cart`、`coupon`、`order`、`payment`。
+- `scenario`：`product`、`cart`、`coupon`、`order`、`payment`、`seckill`。
 - `threads`：并发线程数；认证场景最大500，因为只准备了500个账号。
 - `ramp`：全部线程启动所用秒数，不能一开始就设为0。
 - `loops`：商品和购物车可大于1；优惠券和下单由Once Only控制器保证每用户只执行一次。
 - `port`：MallX端口，默认8080。
 - `current`、`size`：商品列表页码和每页数量，默认1和20。
 - `categoryId`、`brandId`、`keyword`：商品列表可选过滤条件。
+- `productPath`：商品查询路径，默认`/products`；升级版搜索对比时传`/search/products`。
+- `seckillItemId`：秒杀场景必填，为后台创建并预热后返回的秒杀商品ID。
 - 默认主机为`127.0.0.1`。如需远程压测机，可在JMX的`host`默认值中修改。
 
 不要并发执行coupon和order两个场景，也不要在没有重置数据时重复比较结果。压测机和服务端在同一台电脑时，结果只能作为本机基线，不能直接宣传为生产承载能力。

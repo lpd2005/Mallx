@@ -2,7 +2,7 @@
 <jmeterTestPlan version="1.2" properties="5.0" jmeter="5.6.3">
   <hashTree>
       <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="MallX MVP压力测试">
-      <stringProp name="TestPlan.comments">通过-Jscenario切换product、cart、coupon、order、payment；压测前执行prepare-mallx-pressure-data.sql。</stringProp>
+      <stringProp name="TestPlan.comments">通过-Jscenario切换product、cart、coupon、order、payment、seckill；压测前执行prepare-mallx-pressure-data.sql。</stringProp>
       <boolProp name="TestPlan.functional_mode">false</boolProp>
       <boolProp name="TestPlan.tearDown_on_shutdown">true</boolProp>
       <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
@@ -133,7 +133,7 @@ vars.put('address_id', String.valueOf(40001 + n))</stringProp>
                 <elementProp name="keyword" elementType="HTTPArgument"><stringProp name="Argument.name">keyword</stringProp><stringProp name="Argument.value">${__P(keyword,)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
               </collectionProp>
             </elementProp>
-            <stringProp name="HTTPSampler.path">/products</stringProp>
+            <stringProp name="HTTPSampler.path">${__P(productPath,/products)}</stringProp>
             <stringProp name="HTTPSampler.method">GET</stringProp>
             <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
           </HTTPSamplerProxy>
@@ -198,6 +198,50 @@ vars.put('address_id', String.valueOf(40001 + n))</stringProp>
                 <stringProp name="script">if (prev.getResponseCode() == '400' &amp;&amp; prev.getResponseDataAsString().contains('优惠券已领完')) {
     prev.setSuccessful(true)
     prev.setSampleLabel('优惠券领取-库存耗尽预期拒绝')
+}</stringProp>
+              </JSR223PostProcessor>
+              <hashTree/>
+            </hashTree>
+          </hashTree>
+        </hashTree>
+
+        <IfController guiclass="IfControllerPanel" testclass="IfController" testname="秒杀异步下单场景">
+          <stringProp name="IfController.condition">${__groovy(vars.get('scenario') == 'seckill')}</stringProp>
+          <boolProp name="IfController.evaluateAll">false</boolProp>
+          <boolProp name="IfController.useExpression">true</boolProp>
+        </IfController>
+        <hashTree>
+          <OnceOnlyController guiclass="OnceOnlyControllerGui" testclass="OnceOnlyController" testname="每用户只抢购一次"/>
+          <hashTree>
+            <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="02 秒杀资格预扣">
+              <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+              <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+                <collectionProp name="Arguments.arguments">
+                  <elementProp name="" elementType="HTTPArgument">
+                    <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                    <stringProp name="Argument.value">{"addressId":${address_id},"quantity":1}</stringProp>
+                    <stringProp name="Argument.metadata">=</stringProp>
+                  </elementProp>
+                </collectionProp>
+              </elementProp>
+              <stringProp name="HTTPSampler.path">/seckill/items/${__P(seckillItemId,0)}/purchase</stringProp>
+              <stringProp name="HTTPSampler.method">POST</stringProp>
+              <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+            </HTTPSamplerProxy>
+            <hashTree>
+              <SyncTimer guiclass="TestBeanGUI" testclass="SyncTimer" testname="500用户秒杀集合点">
+                <stringProp name="groupSize">${__P(syncUsers,0)}</stringProp>
+                <stringProp name="timeoutInMs">${__P(syncTimeoutMs,120000)}</stringProp>
+              </SyncTimer>
+              <hashTree/>
+              <JSR223PostProcessor guiclass="TestBeanGUI" testclass="JSR223PostProcessor" testname="区分预扣成功与预期售罄">
+                <stringProp name="scriptLanguage">groovy</stringProp>
+                <stringProp name="script">String body = prev.getResponseDataAsString()
+if (prev.getResponseCode() == '200' &amp;&amp; body.contains('&quot;requestNo&quot;')) {
+    prev.setSampleLabel('秒杀资格-预扣成功')
+} else if (prev.getResponseCode() == '400' &amp;&amp; body.contains('秒杀商品已售罄')) {
+    prev.setSuccessful(true)
+    prev.setSampleLabel('秒杀资格-售罄预期拒绝')
 }</stringProp>
               </JSR223PostProcessor>
               <hashTree/>

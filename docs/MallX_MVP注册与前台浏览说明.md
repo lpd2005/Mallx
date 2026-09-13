@@ -24,7 +24,7 @@
 - `password`：必填，8～64位，UTF-8编码后不超过72字节。字节限制用于兼容现有BCrypt实现，中文等多字节字符也会计入。密码不做trim。
 - `nickname`：可选，最长32位；为空或全空白时由用户模块生成默认昵称。
 
-成功响应的 `data` 只包含 `userId`，不返回密码摘要或Token。注册成功后再调用 `POST /auth/login`，携带相同手机号和密码获取会话。后续请求使用登录响应给出的 `tokenName` 和 `tokenValue` 作为请求头。
+成功响应的 `data` 只包含 `userId`，不返回密码摘要或Token。注册成功后再调用 `POST /auth/login`，携带相同手机号和密码获取会话。登录响应中的 `tokenValue` 是 Access Token，后续业务请求使用 `tokenName: tokenValue` 作为请求头；`refreshToken` 只能用于刷新接口。
 
 ### 2.2 执行逻辑
 
@@ -42,6 +42,29 @@
 ### 2.3 当前限制
 
 这是本地开发和演示用的手机号密码注册，**暂未验证手机号归属**。不能将其视为已经完成真实短信注册；正式开放前还需补短信验证码、注册频率限制等防滥用措施。
+
+### 2.4 双Token会话
+
+`POST /auth/login` 成功后同时返回短期 Access Token 和长期 Refresh Token：
+
+```json
+{
+  "userId": 10001,
+  "tokenName": "Authorization",
+  "tokenValue": "access-token",
+  "accessTokenExpiresIn": 1800,
+  "refreshToken": "refresh-token",
+  "refreshTokenExpiresIn": 604800
+}
+```
+
+- Access Token 默认有效30分钟，只用于访问业务接口；保留 `tokenValue` 字段名以兼容现有客户端。
+- Refresh Token 默认有效7天，是独立生成的随机不透明令牌，只在 Redis 中保存其 SHA-256 摘要对应的会话，不能充当 Access Token。
+- Access Token 到期后，调用 `POST /auth/refresh` 并提交 `{"refreshToken":"..."}`，成功后得到一对新令牌。
+- 刷新采用轮换策略：新令牌签发成功后立即注销旧 Access Token并删除旧 Refresh Token；旧 Refresh Token不能再次使用。
+- 同一个 Refresh Token 的并发刷新由 Redisson 分布式锁串行化，只有一个请求能成功，避免并发产生多组有效令牌。
+- 调用 `POST /auth/logout` 时携带当前 Access Token，会同时注销当前 Access Token及其关联的 Refresh Token。
+- 有效期通过 `mallx.auth.token.access-ttl` 和 `mallx.auth.token.refresh-ttl` 配置，Refresh Token有效期必须长于Access Token。
 
 ## 3. 前台商品分页
 

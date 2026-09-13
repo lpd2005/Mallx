@@ -5,6 +5,11 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', component: Catalog, meta: { title: '发现好物' } },
+    {
+      path: '/seckill',
+      component: () => import('./views/Seckill.vue'),
+      meta: { title: '限时秒杀' },
+    },
     { path: '/login', component: () => import('./views/Login.vue'), meta: { title: '登录' } },
     {
       path: '/products/:id',

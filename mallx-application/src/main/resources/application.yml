@@ -16,24 +16,24 @@ spring:
       max-file-size: 5MB
       max-request-size: 6MB
   datasource:
-    url: jdbc:mysql://${mall.db.host}:3306/${mall.db.name:mall}?useUnicode=true&characterEncoding=UTF-8&autoReconnect=true&serverTimezone=Asia/Shanghai
+    url: jdbc:mysql://${mall.db.host}:${mall.db.port}/${mall.db.name}?useUnicode=true&characterEncoding=UTF-8&autoReconnect=true&serverTimezone=Asia/Shanghai
     driver-class-name: com.mysql.cj.jdbc.Driver
     type: com.alibaba.druid.pool.DruidDataSource
-    username: root
+    username: ${mall.db.username}
     password: ${mall.db.pw}
   data:
     redis:
-      host: ${mall.redis.host:localhost}
-      port: ${mall.redis.port:6379}
+      host: ${mall.redis.host}
+      port: ${mall.redis.port}
       # 密码为空时，不设置密码。
       password: ${mall.redis.pw:}
-      database: ${mall.redis.db:0}
+      database: ${mall.redis.db}
   rabbitmq:
-    host: ${mall.mq.host:localhost}
-    port: ${mall.mq.port:5672}
-    username: ${mall.mq.username:guest}
-    password: ${mall.mq.pw:guest}
-    virtual-host: ${mall.mq.virtual-host:/}
+    host: ${mall.mq.host}
+    port: ${mall.mq.port}
+    username: ${mall.mq.username}
+    password: ${mall.mq.pw}
+    virtual-host: ${mall.mq.virtual-host}
     publisher-confirm-type: correlated
     publisher-returns: true
     template:
@@ -50,11 +50,32 @@ spring:
           multiplier: 2
           max-interval: 5s
   elasticsearch:
-    uris: ${mall.search.elasticsearch.uris:http://localhost:9200}
-    username: ${mall.search.elasticsearch.username:}
-    password: ${mall.search.elasticsearch.password:}
+    uris: ${mall.es.uris}
+    username: ${mall.es.username:}
+    password: ${mall.es.password:}
     connection-timeout: 3s
     socket-timeout: 10s
+
+# Sa-Token 的基础会话策略；登录态存储由 sa-token-redis-jackson 接入 Redis。
+sa-token:
+  token-name: Authorization
+  # Access Token默认30分钟；登录时仍由mallx.auth.token.access-ttl显式覆盖。
+  timeout: 1800
+  active-timeout: 1800
+  is-concurrent: true
+  max-login-count: 5
+  is-share: false
+  token-style: uuid
+  is-log: false
+
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
+  global-config:
+    db-config:
+      id-type: assign_id
 
 jetcache:
   statIntervalMinutes: 1
@@ -76,7 +97,25 @@ jetcache:
       broadcastChannel: ${spring.application.name}:${SPRING_PROFILES_ACTIVE:local}:cache-invalidation
       expireAfterWriteInMillis: 600000
 
+# 日志目录默认为父项目运行目录下的 ./logs；本机可通过 LOG_PATH 覆盖。
+logging:
+  file:
+    path: ${LOG_PATH:./logs}
+  level:
+    root: WARN
+    com.mallx: INFO
+
 mallx:
+  auth:
+    token:
+      access-ttl: 30m
+      refresh-ttl: 7d
+  order:
+    # expireAt和RabbitMQ消息TTL共同使用该支付期限。
+    payment-timeout: 30m
+    # 延迟消息是主链路；数据库扫描只低频补偿MQ漏投或消费异常。
+    compensation-cron: "0 */10 * * * *"
+    compensation-batch-size: 100
   search:
     index-alias: product_index
     rebuild-batch-size: 200
@@ -109,31 +148,3 @@ mallx:
       region: ${mall.oss.region:}
       access-key-id: ${mall.oss.access-key-id:}
       access-key-secret: ${mall.oss.access-key-secret:}
-
-# Sa-Token 的基础会话策略；登录态存储由 sa-token-redis-jackson 接入 Redis。
-sa-token:
-  token-name: Authorization
-  timeout: 604800
-  active-timeout: 1800
-  is-concurrent: true
-  max-login-count: 5
-  is-share: false
-  token-style: uuid
-  is-log: false
-
-mybatis-plus:
-  mapper-locations: classpath*:mapper/**/*.xml
-  configuration:
-    map-underscore-to-camel-case: true
-    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
-  global-config:
-    db-config:
-      id-type: assign_id
-
-
-# 日志目录默认为父项目运行目录下的 ./logs；本机可通过 LOG_PATH 覆盖。
-logging:
-  file:
-    path: ${LOG_PATH:./logs}
-  level:
-    root: WARN

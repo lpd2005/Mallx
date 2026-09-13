@@ -121,6 +121,18 @@ DELETE mall_order
 FROM mall_order
 JOIN cleanup_pressure_order ON cleanup_pressure_order.id = mall_order.id;
 
+-- 删除压测用户的秒杀请求快照，并清理由专项压测创建的活动。
+DELETE FROM seckill_order_request
+WHERE user_id BETWEEN 30001 AND 30500;
+
+DELETE seckill_item
+FROM seckill_item
+JOIN seckill_activity ON seckill_activity.id = seckill_item.activity_id
+WHERE seckill_activity.activity_name LIKE 'PRESSURE-SECKILL-%';
+
+DELETE FROM seckill_activity
+WHERE activity_name LIKE 'PRESSURE-SECKILL-%';
+
 -- 删除压测用户券、优惠券操作流水以及限量100张的压测模板。
 DELETE coupon_operation_log
 FROM coupon_operation_log
@@ -148,6 +160,11 @@ JOIN cleanup_pressure_sku ON cleanup_pressure_sku.id = inventory_operation.sku_i
 DELETE inventory_stock
 FROM inventory_stock
 JOIN cleanup_pressure_sku ON cleanup_pressure_sku.id = inventory_stock.sku_id;
+
+-- Outbox 是商品搜索同步的历史投递记录，不受商品外键级联约束，需要随压测 SPU 一并清理。
+DELETE product_search_outbox
+FROM product_search_outbox
+JOIN cleanup_pressure_spu ON cleanup_pressure_spu.id = product_search_outbox.spu_id;
 
 DELETE product_sku
 FROM product_sku
@@ -232,6 +249,10 @@ UNION ALL
 SELECT 'pressure_inventory', COUNT(*)
 FROM inventory_stock
 WHERE sku_id IN (60001, 60002) OR sku_id BETWEEN 3000001 AND 3020000
+UNION ALL
+SELECT 'pressure_search_outbox', COUNT(*)
+FROM product_search_outbox
+WHERE spu_id = 50001 OR spu_id BETWEEN 800001 AND 810000
 UNION ALL
 SELECT 'pressure_skus', COUNT(*)
 FROM product_sku

@@ -100,6 +100,52 @@ describe('后端接口边界', () => {
     await expect(make({ onUnauthorized: unauthorized }).get('/me')).rejects.toThrow('登录过期')
     expect(unauthorized).toHaveBeenCalledOnce()
   })
+  it('并发401只轮换一次Refresh Token并用新Access Token重试', async () => {
+    let auth = {
+      tokenName: 'Authorization',
+      tokenValue: 'old-access',
+      refreshToken: 'old-refresh',
+    }
+    const updateSession = vi.fn((value) => {
+      auth = value
+    })
+    adapter.mockImplementation(async (config) => {
+      if (config.url === '/auth/refresh')
+        return {
+          status: 200,
+          headers: {},
+          config,
+          data: JSON.stringify({
+            code: 200,
+            data: {
+              tokenName: 'Authorization',
+              tokenValue: 'new-access',
+              refreshToken: 'new-refresh',
+            },
+          }),
+        }
+      if (config.headers.get('Authorization') === 'old-access')
+        throw new AxiosError('unauthorized', undefined, config, null, {
+          status: 401,
+          data: '{"code":401,"message":"Access Token已过期"}',
+        })
+      return {
+        status: 200,
+        headers: {},
+        config,
+        data: '{"code":200,"data":"ok"}',
+      }
+    })
+    const api = createApi({ session: () => auth, updateSession })
+    await expect(Promise.all([api.get('/first'), api.get('/second')])).resolves.toEqual([
+      'ok',
+      'ok',
+    ])
+    expect(adapter.mock.calls.filter(([config]) => config.url === '/auth/refresh')).toHaveLength(1)
+    expect(updateSession).toHaveBeenCalledWith(
+      expect.objectContaining({ tokenValue: 'new-access', refreshToken: 'new-refresh' }),
+    )
+  })
   it('网络失败不伪装成成功', async () => {
     adapter.mockRejectedValue(new AxiosError('Network Error', 'ERR_NETWORK'))
     await expect(make().get('/products')).rejects.toThrow('无法连接服务')

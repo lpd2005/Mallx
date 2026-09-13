@@ -1,6 +1,7 @@
 package com.mallx.auth.service;
 
 import com.mallx.auth.dto.LoginRequest;
+import com.mallx.auth.dto.RefreshTokenRequest;
 import com.mallx.auth.dto.RegisterRequest;
 import com.mallx.auth.vo.CurrentUserResponse;
 import com.mallx.auth.vo.LoginResponse;
@@ -19,6 +20,9 @@ public interface AuthService {
      * @return 新会话的令牌信息
      */
     LoginResponse login(LoginRequest request);
+
+    /** 使用一次性Refresh Token轮换一对新令牌。 */
+    LoginResponse refresh(RefreshTokenRequest request);
 
     /** 注销当前会话。 */
     void logout();

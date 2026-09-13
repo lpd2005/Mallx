@@ -326,8 +326,8 @@
         <appender-ref ref="CONSOLE"/>
     </logger>
 
-    <!-- 根日志：所有未匹配到上述 logger 的日志（框架、三方库等）写入应用总日志 + 控制台 -->
-    <root level="INFO">
+    <!-- 根日志：框架和三方库默认只记录WARN及以上，避免普通INFO淹没业务日志 -->
+    <root level="WARN">
         <appender-ref ref="APPLICATION"/>
         <appender-ref ref="CONSOLE"/>
     </root>
